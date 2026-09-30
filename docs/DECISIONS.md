@@ -236,3 +236,12 @@ error with a reason, last sync time). `ToastStore` never loads anything, so its 
 
 `package.json` declares `"engines": { "node": ">=22.12" }`, the lowest version supported by Vitest 5
 and `eslint-plugin-jsdoc`.
+
+### D34. Overrides for deprecated transitive dependencies
+
+The latest `workbox-build` (via `vite-plugin-pwa`) depends on the deprecated `glob@^11`, and the
+latest `xcode` (via `@capacitor/cli`) on the deprecated `uuid@^7`. `package.json` `overrides`
+scope **`glob@^13`** to `workbox-build` and **`uuid@^11`** to `xcode`. Both keep the APIs those
+packages call (`globSync`, the CommonJS `uuid.v4`); uuid 11 is the version its own deprecation
+notice recommends for CommonJS. The remaining `eslint@9` deprecation warning is expected (D1).
+Remove the overrides when upstream updates the ranges.

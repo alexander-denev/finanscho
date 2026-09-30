@@ -44,7 +44,11 @@
   min-height: var(--tap);
   padding: 0 var(--sp-3);
   border: 0;
-  background: transparent;
+  /* Opaque (not transparent): Chromium derives the native <select> popup's light/dark
+     rendering from the select's own background, not an ancestor's. A transparent
+     background makes it composite over a light popup regardless of color-scheme. */
+  background: var(--c-raised);
+  color: var(--c-ink);
   font-size: var(--fs-md);
 }
 
