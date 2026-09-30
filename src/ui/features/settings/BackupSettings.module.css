@@ -1,0 +1,20 @@
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.fileField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.fileLabel {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+}
+
+.fileInput {
+  min-height: var(--tap);
+}

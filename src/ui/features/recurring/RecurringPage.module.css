@@ -1,0 +1,12 @@
+.list {
+  border-top: var(--hairline) solid var(--c-rule);
+}
+
+.upcoming {
+  margin-top: var(--sp-6);
+}
+
+.sectionTitle {
+  margin-bottom: var(--sp-2);
+  font-size: var(--fs-lg);
+}

@@ -1,0 +1,19 @@
+.list > li {
+  border-bottom: var(--hairline) solid var(--c-rule);
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: var(--tap);
+  padding: var(--sp-3) 0;
+  color: var(--c-ink);
+  font-size: var(--fs-lg);
+  text-decoration: none;
+}
+
+.chevron {
+  margin-left: auto;
+  color: var(--c-muted);
+}

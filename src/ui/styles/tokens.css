@@ -1,0 +1,163 @@
+/*
+ * Design tokens (see docs/DESIGN.md). CSS Modules reference only these custom properties.
+ * Light values are the default; dark values apply for prefers-color-scheme: dark (unless the user
+ * chose light) and when the user chose dark explicitly.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Palette */
+  --c-paper: #f6f3ec;
+  --c-ink: #1b2420;
+  --c-pine: #1f4a45;
+  --c-brass: #8a5e12;
+  --c-moss: #2e6634;
+  --c-brick: #a0372a;
+
+  /* Neutrals */
+  --c-raised: #fffdf8;
+  --c-sunken: #ede8dc;
+  --c-rule: #d9d1c0;
+  --c-muted: #5b645f;
+  --c-on-pine: #ffffff;
+  --c-near: #8a5e12;
+  --c-pine-soft: #e3ece7;
+  --c-brick-soft: #f6e3de;
+  --c-scrim: rgb(17 22 20 / 45%);
+
+  /* Swatches */
+  --sw-teal: #2a7f76;
+  --sw-blue: #3566a8;
+  --sw-plum: #7a4b8c;
+  --sw-amber: #b7791f;
+  --sw-rust: #b4532a;
+  --sw-olive: #6b7a2a;
+  --sw-rose: #b34a6a;
+  --sw-slate: #56657a;
+
+  /* Typography */
+  --font-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-md: 1rem;
+  --fs-lg: 1.1875rem;
+  --fs-xl: 1.4375rem;
+  --fs-2xl: 1.75rem;
+  --fs-3xl: 2.125rem;
+  --lh-tight: 1.25;
+  --lh-body: 1.5;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-strong: 600;
+
+  /* Spacing */
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.5rem;
+  --sp-6: 2rem;
+  --sp-7: 3rem;
+  --sp-8: 4rem;
+
+  /* Radius */
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-lg: 14px;
+  --r-pill: 999px;
+
+  /* Sizes */
+  --tap: 44px;
+  --hairline: 1px;
+  --focus-ring: 2px;
+  --progress-h: 6px;
+  --dot: 10px;
+  --icon: 20px;
+  --content-max: 44rem;
+  --sidebar-w: 15rem;
+  --tabbar-h: 60px;
+  --fab: 56px;
+  --dialog-max: 32rem;
+  --measure: 34em;
+  --field-min: 12rem;
+  --month-label: 9em;
+
+  /* Elevation and motion */
+  --shadow-float: 0 10px 30px rgb(17 22 20 / 18%), 0 2px 6px rgb(17 22 20 / 12%);
+  --dur-fast: 120ms;
+  --dur-med: 180ms;
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+
+  /* Safe areas */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --c-paper: #111614;
+    --c-ink: #e8e5dc;
+    --c-pine: #86c9bb;
+    --c-brass: #e2b45c;
+    --c-moss: #8fcb93;
+    --c-brick: #f2917f;
+    --c-raised: #18201d;
+    --c-sunken: #0c100e;
+    --c-rule: #2b3531;
+    --c-muted: #a1aca6;
+    --c-on-pine: #0d1a17;
+    --c-near: #e2b45c;
+    --c-pine-soft: #1c2d29;
+    --c-brick-soft: #33201c;
+    --c-scrim: rgb(0 0 0 / 60%);
+    --sw-teal: #5fc0b3;
+    --sw-blue: #7ea8e6;
+    --sw-plum: #c198d6;
+    --sw-amber: #e6b35a;
+    --sw-rust: #e98d63;
+    --sw-olive: #b4c46a;
+    --sw-rose: #e68aa6;
+    --sw-slate: #9aaabf;
+    --shadow-float: 0 10px 30px rgb(0 0 0 / 50%), 0 2px 6px rgb(0 0 0 / 40%);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --c-paper: #111614;
+  --c-ink: #e8e5dc;
+  --c-pine: #86c9bb;
+  --c-brass: #e2b45c;
+  --c-moss: #8fcb93;
+  --c-brick: #f2917f;
+  --c-raised: #18201d;
+  --c-sunken: #0c100e;
+  --c-rule: #2b3531;
+  --c-muted: #a1aca6;
+  --c-on-pine: #0d1a17;
+  --c-near: #e2b45c;
+  --c-pine-soft: #1c2d29;
+  --c-brick-soft: #33201c;
+  --c-scrim: rgb(0 0 0 / 60%);
+  --sw-teal: #5fc0b3;
+  --sw-blue: #7ea8e6;
+  --sw-plum: #c198d6;
+  --sw-amber: #e6b35a;
+  --sw-rust: #e98d63;
+  --sw-olive: #b4c46a;
+  --sw-rose: #e68aa6;
+  --sw-slate: #9aaabf;
+  --shadow-float: 0 10px 30px rgb(0 0 0 / 50%), 0 2px 6px rgb(0 0 0 / 40%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-med: 0ms;
+  }
+}

@@ -1,0 +1,61 @@
+.headline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.headlineLabel {
+  font-family: var(--font-sans);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+  color: var(--c-muted);
+}
+
+.totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-5);
+}
+
+.muted {
+  color: var(--c-muted);
+}
+
+.flow {
+  margin: 0;
+}
+
+.flowRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4);
+  padding: var(--sp-3) 0;
+  border-top: var(--hairline) solid var(--c-rule);
+  border-bottom: var(--hairline) solid var(--c-rule);
+}
+
+.flowRow dt {
+  color: var(--c-muted);
+  font-size: var(--fs-sm);
+}
+
+.flowRow dd {
+  margin: 0;
+}
+
+.budgetSummary {
+  margin-bottom: var(--sp-3);
+}
+
+.budgetList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.budgetItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  font-size: var(--fs-sm);
+}

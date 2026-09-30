@@ -1,0 +1,5 @@
+.amount {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-strong);
+  font-variant-numeric: tabular-nums;
+}

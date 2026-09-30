@@ -1,0 +1,38 @@
+.total {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0;
+  color: var(--c-muted);
+  font-size: var(--fs-sm);
+}
+
+.day {
+  margin-top: var(--sp-5);
+}
+
+.dayHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-1);
+  border-bottom: var(--hairline) solid var(--c-ink);
+}
+
+.dayTitle {
+  font-size: var(--fs-md);
+}
+
+.dayNet {
+  display: flex;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--sp-5);
+}

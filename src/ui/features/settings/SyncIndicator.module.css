@@ -1,0 +1,43 @@
+.root {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--tap);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-sm);
+  color: var(--c-muted);
+  text-decoration: none;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-tight);
+}
+
+.root:hover {
+  background: var(--c-pine-soft);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+}
+
+.state {
+  font-weight: var(--fw-strong);
+  color: var(--c-ink);
+}
+
+.time {
+  font-size: var(--fs-xs);
+}
+
+.idle svg {
+  color: var(--c-moss);
+}
+
+.syncing svg {
+  color: var(--c-pine);
+}
+
+.error svg,
+.error .state {
+  color: var(--c-brick);
+}

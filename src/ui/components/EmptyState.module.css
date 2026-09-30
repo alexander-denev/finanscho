@@ -1,0 +1,22 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-6) 0;
+  border-top: var(--hairline) solid var(--c-rule);
+  border-bottom: var(--hairline) solid var(--c-rule);
+}
+
+.title {
+  font-size: var(--fs-xl);
+}
+
+.body {
+  max-width: var(--measure);
+  color: var(--c-muted);
+}
+
+.action {
+  margin-top: var(--sp-2);
+}

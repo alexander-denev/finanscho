@@ -1,0 +1,22 @@
+.totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-5);
+  margin-bottom: var(--sp-5);
+}
+
+.archived {
+  margin-top: var(--sp-6);
+}
+
+.sectionTitle {
+  margin-bottom: var(--sp-2);
+  font-size: var(--fs-lg);
+  color: var(--c-muted);
+}
+
+.note {
+  margin-top: var(--sp-4);
+  color: var(--c-muted);
+  font-size: var(--fs-sm);
+}

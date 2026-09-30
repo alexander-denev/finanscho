@@ -1,0 +1,6 @@
+.icon {
+  width: var(--icon);
+  height: var(--icon);
+  flex: none;
+  vertical-align: middle;
+}

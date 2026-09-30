@@ -1,0 +1,130 @@
+# Architecture
+
+Finanscho is a local-first personal finance app. All data lives in IndexedDB on the device; an
+optional WebDAV server lets several devices exchange changes. One codebase runs as a PWA on the
+desktop and inside Capacitor shells on Android and iOS.
+
+## Layers
+
+```
+ui  ──►  state  ──►  core (services ──► domain, ports)
+                          ▲
+infrastructure ───────────┘   (implements core ports)
+
+app/    composition root — the only module that knows every layer
+shared/ leaf utilities (debounce, assert, ChangeFeed) — imports no other layer
+```
+
+Dependencies point inward only. `eslint.config.js` enforces this with `no-restricted-imports`
+per folder, plus `import-x/no-cycle`:
+
+| Files under             | May not import                                                                            |
+| ----------------------- | ----------------------------------------------------------------------------------------- |
+| `src/core/**`           | infrastructure, state, ui, app, `preact`, `@preact/signals(-core)`, `idb`, `@capacitor/*` |
+| `src/infrastructure/**` | state, ui, app, `preact`, `@preact/signals`                                               |
+| `src/state/**`          | infrastructure, ui, app, `preact`, `@preact/signals`, `idb`, `@capacitor/*`               |
+| `src/ui/**`             | infrastructure, core/services, app, `idb`, `@preact/signals-core`, `@capacitor/*`         |
+| `src/shared/**`         | every other layer and framework package                                                   |
+
+### What lives where
+
+| Folder                        | Contents                                                                                                                                                                                 |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/core/domain`             | Pure rules: money (minor units), local dates, entity factories/validators, recurrence schedule. No I/O, no clock.                                                                        |
+| `src/core/ports`              | JSDoc contracts: repositories, clock, id generator, change feed, credential store, sync transport/control.                                                                               |
+| `src/core/services`           | Use cases with constructor injection: accounts, categories, transactions, budgets, recurring, dashboard, backup, settings.                                                               |
+| `src/core/errors.js`          | Typed errors (`ValidationError`, `NotFoundError`, `BackupError`, `SyncError`) with stable codes for i18n.                                                                                |
+| `src/infrastructure/db`       | `database.js` (schema + migrations), `ChangeRecorder` (the only entity writer), IndexedDB repositories, credential store.                                                                |
+| `src/infrastructure/sync`     | `HybridLogicalClock`, `operation.js`, `deviceHead.js`, `merge.js` (pure LWW merge), `SyncEngine` (pull/push), `SyncScheduler` (triggers, backoff, status), `webdav/` (client, adapters). |
+| `src/infrastructure/platform` | `platform.js` (native vs web), `lifecycle.js` (resume/pause), `localMidnight.js`.                                                                                                        |
+| `src/state`                   | Stores on `@preact/signals-core`: private writable signals, public read-only getters, `computed()` views, async actions, `status`/`error`, `invalidate()`.                               |
+| `src/ui`                      | Preact components. `components/` generic, `features/<name>/` pages and feature parts, `hooks/`, `router/`, `i18n/`, `styles/`.                                                           |
+| `src/app`                     | `createContainer.js` wires everything; `App.jsx`, `AppShell.jsx`, `routes.js`, `storeInvalidation.js`.                                                                                   |
+
+## Data flow
+
+### A local change
+
+```
+TransactionForm ──onSubmit──► TransactionsStore.save()
+    ──► TransactionService.create()          validates with domain rules, throws ValidationError
+    ──► IdbTransactionRepository.create()
+    ──► ChangeRecorder.write()               one IndexedDB transaction:
+                                              tick HLC → merge op into record (_clocks) → append to outbox
+    ──► ChangeFeed.publish({ entities: ['transactions'], source: 'local' })   after commit
+    ──► bindStoreInvalidation (app)          every store depending on 'transactions' → invalidate()
+    ──► stores reload their bounded queries  → signals update → components re-render
+    ──► SyncScheduler                         local change → sync 5 s later (debounced)
+```
+
+Validation errors travel back as `ValidationError.fields` (field → i18n key) and are shown inline
+next to the field, linked with `aria-describedby`.
+
+### A remote change
+
+```
+SyncScheduler ──► SyncEngine.sync()  (mutex; pull then push)
+    pull: PROPFIND devices/ → GET head.json → GET segments → ChangeRecorder.applyRemote()
+          (merge + cursor advance in one IndexedDB transaction per segment)
+    ──► RecurringService.materialize()
+    ──► ChangeFeed.publish({ source: 'remote' })  → the same store invalidation path
+    push: segment PUT → head PUT → outbox trim
+```
+
+Stores never know about sync; they only react to the change feed.
+
+## Derived data
+
+Balances, budget spending, dashboard totals, and "next occurrence" dates are always computed:
+
+- account balance = opening balance + `netForAccount()` (streamed through the `accountId` and
+  `toAccountId` indexes);
+- budget spent = expenses from the `[categoryId+date]` index for the month, in the budget's
+  currency;
+- month flow = the month's transactions from the `[date+createdAt]` index.
+
+Nothing aggregated is stored, so there is nothing to conflict during sync.
+
+## Startup
+
+`main.jsx` → `createContainer()`:
+
+1. open IndexedDB (running migrations), get or create the device id, set a default device name;
+2. build repositories and services;
+3. replay deferred remote ops, seed default categories once, materialize recurring transactions;
+4. build the sync scheduler (iOS: native HTTP; Android and web: `fetch`) and the stores;
+5. bind store invalidation, load all stores;
+6. start the local-midnight timer, request persistent storage, start sync in the background.
+
+If IndexedDB cannot be opened (for example in some private windows), a plain explanation is shown.
+On the web a service worker (vite-plugin-pwa) caches the app shell for offline use; native builds
+skip it.
+
+## Sync
+
+See [SYNC_PROTOCOL.md](SYNC_PROTOCOL.md) for the server layout, op format, HLC, merge rules,
+deterministic IDs, crash safety, and transport details.
+
+## UI
+
+- Hash router (`#/transactions`) built on a signal, created by the composition root, so it works
+  from `file://`-like Capacitor origins and any static host.
+- `AppShell`: bottom tab bar and floating "Add transaction" button below 1024 px; left sidebar
+  from 1024 px (CSS only). Hosts the sync indicator and toasts; moves focus to `<main>` after
+  navigation.
+- Pages call `useStores()`; generic components in `ui/components` receive props only.
+- Styling: CSS Modules referencing design tokens in `ui/styles/tokens.css` (see
+  [DESIGN.md](DESIGN.md)); light and dark themes; `prefers-reduced-motion` respected.
+- All strings go through `t()` (`ui/i18n/en.js`); money, dates, and relative times use `Intl`.
+
+## Testing
+
+| Project | Environment                 | Covers                                                                                               |
+| ------- | --------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `node`  | Node + `fake-indexeddb`     | domain, services, repositories, ChangeRecorder, merge property tests, sync engine, scheduler, stores |
+| `dom`   | happy-dom + Testing Library | generic components, router, i18n, app shell, and each page's main flow                               |
+
+Sync tests use `tests/helpers/InMemoryWebDav.js`, a fake WebDAV server implementing the HTTP
+adapter port, and simulate three devices with separate databases (scripted and randomized
+histories, crashes between segment and head writes, duplicate delivery, malformed files, newer
+vault formats). `WebDavClient.test.js` runs in the DOM environment for `DOMParser`.

@@ -1,0 +1,35 @@
+.section + .section {
+  margin-top: var(--sp-6);
+}
+
+.sectionTitle {
+  margin-bottom: var(--sp-2);
+  font-size: var(--fs-lg);
+}
+
+.list {
+  border-top: var(--hairline) solid var(--c-rule);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--sp-2) var(--sp-1);
+  border: 0;
+  border-bottom: var(--hairline) solid var(--c-rule);
+  background: transparent;
+  color: var(--c-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--c-pine-soft);
+}
+
+.name {
+  flex: 1;
+}

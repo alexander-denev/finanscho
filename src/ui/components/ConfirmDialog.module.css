@@ -1,0 +1,10 @@
+.message {
+  margin-bottom: var(--sp-5);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}

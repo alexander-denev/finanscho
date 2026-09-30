@@ -1,0 +1,28 @@
+.track {
+  position: relative;
+  width: 100%;
+  height: var(--progress-h);
+  border-radius: var(--r-md);
+  background: var(--c-sunken);
+  overflow: hidden;
+}
+
+.fill {
+  width: calc(var(--progress) * 100%);
+  height: 100%;
+  border-radius: var(--r-md);
+  background: var(--tone);
+  transition: width var(--dur-med) var(--ease);
+}
+
+.under {
+  --tone: var(--c-moss);
+}
+
+.near {
+  --tone: var(--c-near);
+}
+
+.over {
+  --tone: var(--c-brick);
+}

@@ -1,0 +1,39 @@
+.amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-strong);
+  line-height: var(--lh-tight);
+  white-space: nowrap;
+}
+
+.md {
+  font-size: var(--fs-md);
+}
+
+.lg {
+  font-size: var(--fs-lg);
+}
+
+.xl {
+  font-size: var(--fs-3xl);
+  font-weight: var(--fw-medium);
+}
+
+.neutral {
+  color: var(--c-ink);
+}
+
+.positive {
+  color: var(--c-moss);
+}
+
+.negative {
+  color: var(--c-brick);
+}
+
+.muted {
+  color: var(--c-muted);
+}
+
+.glyph {
+  font-weight: var(--fw-regular);
+}

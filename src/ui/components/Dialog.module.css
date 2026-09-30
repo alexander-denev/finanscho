@@ -1,0 +1,51 @@
+.dialog {
+  width: min(100% - 2 * var(--sp-4), var(--dialog-max));
+  max-height: calc(100dvh - 2 * var(--sp-4) - var(--safe-top) - var(--safe-bottom));
+  margin: auto;
+  padding: 0;
+  border: var(--hairline) solid var(--c-rule);
+  border-radius: var(--r-lg);
+  background: var(--c-raised);
+  color: var(--c-ink);
+  box-shadow: var(--shadow-float);
+  overflow: auto;
+}
+
+.dialog::backdrop {
+  background: var(--c-scrim);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-5);
+  border-bottom: var(--hairline) solid var(--c-rule);
+  background: var(--c-raised);
+}
+
+.title {
+  font-size: var(--fs-xl);
+}
+
+.body {
+  padding: var(--sp-5);
+}
+
+@media (max-width: 767px) {
+  .dialog {
+    width: 100%;
+    max-width: none;
+    margin: auto 0 0;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    padding-bottom: var(--safe-bottom);
+  }
+}

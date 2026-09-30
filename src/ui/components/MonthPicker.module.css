@@ -1,0 +1,13 @@
+.root {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.label {
+  min-width: var(--month-label);
+  text-align: center;
+  font-family: var(--font-serif);
+  font-size: var(--fs-lg);
+}

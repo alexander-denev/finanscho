@@ -1,0 +1,112 @@
+import { AccountsStore } from '../../src/state/AccountsStore.js';
+import { CategoriesStore } from '../../src/state/CategoriesStore.js';
+import { TransactionsStore } from '../../src/state/TransactionsStore.js';
+import { BudgetsStore } from '../../src/state/BudgetsStore.js';
+import { RecurringStore } from '../../src/state/RecurringStore.js';
+import { DashboardStore } from '../../src/state/DashboardStore.js';
+import { SettingsStore } from '../../src/state/SettingsStore.js';
+import { SyncStore } from '../../src/state/SyncStore.js';
+import { ToastStore } from '../../src/state/ToastStore.js';
+import { bindStoreInvalidation } from '../../src/app/storeInvalidation.js';
+import { createTestServices } from './testServices.js';
+
+/** @typedef {import('../../src/core/ports/syncTransport.js').SyncStatus} SyncStatus */
+
+/**
+ * A SyncControl stand-in that records calls.
+ * @returns {import('../../src/core/ports/syncTransport.js').SyncControl & { calls: string[], emit: (s: Partial<SyncStatus>) => void }}
+ */
+export function createFakeSyncControl() {
+  /** @type {SyncStatus} */
+  let status = { state: 'disabled', reason: null, lastSyncedAt: null, deferredOps: 0, issues: 0 };
+  /** @type {Set<(s: SyncStatus) => void>} */
+  const listeners = new Set();
+  /** @type {import('../../src/core/ports/credentialStore.js').WebDavCredentials | null} */
+  let config = null;
+  /** @type {string[]} */
+  const calls = [];
+  return {
+    calls,
+    emit(changes) {
+      status = { ...status, ...changes };
+      for (const l of listeners) l(status);
+    },
+    getStatus: () => status,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    async syncNow() {
+      calls.push('syncNow');
+    },
+    async getConfig() {
+      return config;
+    },
+    async configure(c) {
+      calls.push(c ? 'configure' : 'clear');
+      config = c;
+    },
+    async testConnection(c) {
+      calls.push('test');
+      return c.password === 'right' ? { ok: true } : { ok: false, reason: 'auth' };
+    },
+  };
+}
+
+/**
+ * Real services on fake-indexeddb, real stores, and change-feed invalidation — the same wiring as
+ * the composition root, minus sync.
+ * @param {Parameters<typeof createTestServices>[0]} [options]
+ */
+export async function createTestStores(options) {
+  const t = await createTestServices(options);
+  await t.services.categories.seedDefaults();
+  const accounts = new AccountsStore({ accountService: t.services.accounts });
+  const stores = {
+    accounts,
+    categories: new CategoriesStore({ categoryService: t.services.categories }),
+    transactions: new TransactionsStore({
+      transactionService: t.services.transactions,
+      accountsStore: accounts,
+    }),
+    budgets: new BudgetsStore({ budgetService: t.services.budgets, clock: t.clock }),
+    recurring: new RecurringStore({ recurringService: t.services.recurring }),
+    dashboard: new DashboardStore({ dashboardService: t.services.dashboard }),
+    settings: new SettingsStore({
+      settingsService: t.services.settings,
+      backupService: t.services.backup,
+    }),
+    sync: new SyncStore({ syncControl: createFakeSyncControl() }),
+    toasts: new ToastStore(),
+  };
+  const unbind = bindStoreInvalidation(t.feed, [
+    { store: stores.accounts, dependsOn: AccountsStore.DEPENDS_ON },
+    { store: stores.categories, dependsOn: CategoriesStore.DEPENDS_ON },
+    { store: stores.transactions, dependsOn: TransactionsStore.DEPENDS_ON },
+    { store: stores.budgets, dependsOn: BudgetsStore.DEPENDS_ON },
+    { store: stores.recurring, dependsOn: RecurringStore.DEPENDS_ON },
+    { store: stores.dashboard, dependsOn: DashboardStore.DEPENDS_ON },
+  ]);
+  await Promise.all([
+    stores.accounts.load(),
+    stores.categories.load(),
+    stores.transactions.load(),
+    stores.budgets.load(),
+    stores.recurring.load(),
+    stores.dashboard.load(),
+    stores.settings.load(),
+    stores.sync.load(),
+  ]);
+  /** Waits for every store's pending reloads. */
+  const settled = () =>
+    Promise.all([
+      stores.accounts.settled(),
+      stores.categories.settled(),
+      stores.transactions.settled(),
+      stores.budgets.settled(),
+      stores.recurring.settled(),
+      stores.dashboard.settled(),
+      stores.settings.settled(),
+    ]);
+  return { ...t, stores, settled, unbind };
+}

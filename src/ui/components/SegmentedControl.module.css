@@ -1,0 +1,63 @@
+.root {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.legend {
+  margin-bottom: var(--sp-1);
+  padding: 0;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+}
+
+.options {
+  display: flex;
+  border: var(--hairline) solid var(--c-rule);
+  border-radius: var(--r-sm);
+  background: var(--c-raised);
+  overflow: hidden;
+}
+
+.option {
+  position: relative;
+  flex: 1;
+  display: flex;
+}
+
+.option + .option {
+  border-left: var(--hairline) solid var(--c-rule);
+}
+
+.input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.text {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap);
+  padding: 0 var(--sp-3);
+  font-weight: var(--fw-strong);
+  color: var(--c-muted);
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.input:checked + .text {
+  background: var(--c-pine);
+  color: var(--c-on-pine);
+}
+
+.input:focus-visible + .text {
+  outline: var(--focus-ring) solid var(--c-brass);
+  outline-offset: calc(-1 * var(--focus-ring));
+}

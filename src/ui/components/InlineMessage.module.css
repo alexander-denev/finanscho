@@ -1,0 +1,34 @@
+.root {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-left: var(--focus-ring) solid var(--tone);
+  background: var(--c-raised);
+  color: var(--c-ink);
+}
+
+.info {
+  --tone: var(--c-pine);
+}
+
+.success {
+  --tone: var(--c-moss);
+}
+
+.error {
+  --tone: var(--c-brick);
+}
+
+.root > svg {
+  color: var(--tone);
+  margin-top: var(--hairline);
+}
+
+.text {
+  flex: 1;
+}
+
+.action {
+  flex: none;
+}
