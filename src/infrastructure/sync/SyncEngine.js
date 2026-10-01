@@ -41,6 +41,14 @@ export const COMPACT_MIN_OPS = 5000;
  */
 
 /** @typedef {{ deviceId: string, lastSeq: number }} CursorRow */
+/** @typedef {import('../../core/ports/syncTransport.js').DeviceInfo} DeviceInfo */
+
+/**
+ * @typedef {object} RemovalRequest
+ * @property {string} deviceId
+ * @property {() => void} resolve
+ * @property {(error: unknown) => void} reject
+ */
 
 /** Runs sync cycles against one vault. */
 export class SyncEngine {
@@ -62,6 +70,20 @@ export class SyncEngine {
   #again = false;
   #republished = false;
   #compactRequested = false;
+  /** @type {RemovalRequest[]} */
+  #removals = [];
+  /**
+   * Remote device folders listed by the last pull.
+   * @type {Set<string>}
+   */
+  #listed = new Set();
+  /**
+   * Heads from the last pull: null when malformed, absent when the folder has none.
+   * @type {Map<string, DeviceHead | null>}
+   */
+  #remoteHeads = new Map();
+  /** @type {DeviceInfo[]} */
+  #devices = [];
 
   /**
    * @param {{
@@ -122,6 +144,9 @@ export class SyncEngine {
           result = await this.#cycle();
         } while (this.#again);
         return result;
+      } catch (error) {
+        for (const request of this.#removals.splice(0)) request.reject(error);
+        throw error;
       } finally {
         this.#current = null;
       }
@@ -139,13 +164,123 @@ export class SyncEngine {
     return this.sync();
   }
 
+  /**
+   * Removes another device's folder from the vault (§11): after a full pull, only if every change
+   * from it is applied here, and only after a fresh checkpoint of this device — which now contains
+   * that device's surviving data — is published. Rejects with `removeIncomplete` otherwise.
+   * Runs inside the sync mutex, as part of a cycle.
+   * @param {string} deviceId
+   * @returns {Promise<void>}
+   */
+  removeDevice(deviceId) {
+    const removed = new Promise((resolve, reject) => {
+      this.#removals.push({ deviceId, resolve: () => resolve(undefined), reject });
+    });
+    // Failures reach the caller through `removed`.
+    this.sync().catch(() => {});
+    return /** @type {Promise<void>} */ (removed);
+  }
+
+  /**
+   * The devices in this vault as of the last cycle, this device first.
+   * @returns {DeviceInfo[]}
+   */
+  devices() {
+    return this.#devices;
+  }
+
   /** @returns {Promise<SyncResult>} */
   async #cycle() {
     await this.#prepare();
     const pull = await this.#pull();
-    const pushed = await this.#push();
+    let pushed = await this.#push();
+    for (const request of this.#removals.splice(0)) {
+      try {
+        pushed += await this.#remove(request.deviceId);
+        request.resolve();
+      } catch (error) {
+        request.reject(error);
+      }
+    }
     const maintenance = await this.#maintain();
+    await this.#refreshDevices();
     return { ...pull, ...maintenance, pushed: pushed + maintenance.pushed };
+  }
+
+  /**
+   * @param {string} deviceId
+   * @returns {Promise<number>} ops published for the checkpoint
+   */
+  async #remove(deviceId) {
+    if (deviceId === this.#deviceId) {
+      throw new SyncError('removeIncomplete', 'A device cannot remove itself');
+    }
+    if (!this.#listed.has(deviceId)) {
+      await this.#db.delete(STORES.syncCursors, deviceId);
+      return 0;
+    }
+    const head = this.#remoteHeads.get(deviceId);
+    const row = /** @type {CursorRow | undefined} */ (
+      await this.#db.get(STORES.syncCursors, deviceId)
+    );
+    const deferred = /** @type {Op[] | undefined} */ (
+      await this.#db.get(STORES.meta, META_KEYS.deferredOps)
+    );
+    const behind = head === null || (head !== undefined && (row?.lastSeq ?? 0) < head.lastSeq);
+    if (behind || (deferred ?? []).some((op) => op.deviceId === deviceId)) {
+      throw new SyncError('removeIncomplete', `Not every change from ${deviceId} is applied here`);
+    }
+    const createdAt = this.#nowIso();
+    let checkpoint = await this.#recorder.queueCheckpoint({ createdAt });
+    let pushed = 0;
+    if (!checkpoint) {
+      // Local writes (or an earlier checkpoint) were still queued: publish them, then try again.
+      pushed += await this.#push();
+      checkpoint = await this.#recorder.queueCheckpoint({ createdAt });
+    }
+    pushed += await this.#push();
+    if (!checkpoint || (await this.#pendingCheckpoint()) !== null) {
+      throw new SyncError('removeIncomplete', 'Could not publish a checkpoint first');
+    }
+    // The single exception to single-writer: user-initiated, and it only ever deletes (§11).
+    await this.#transport.delete(`devices/${deviceId}/`);
+    await this.#db.delete(STORES.syncCursors, deviceId);
+    this.#listed.delete(deviceId);
+    this.#remoteHeads.delete(deviceId);
+    return pushed;
+  }
+
+  /**
+   * Rebuilds the device list from the last pull's heads and this device's own head.
+   * @returns {Promise<void>}
+   */
+  async #refreshDevices() {
+    const rows = /** @type {CursorRow[]} */ (await this.#db.getAll(STORES.syncCursors));
+    const cursors = new Map(rows.map((r) => [r.deviceId, r.lastSeq]));
+    const own = await this.#loadOwnHead();
+    /** @type {DeviceInfo[]} */
+    const devices = [
+      {
+        deviceId: this.#deviceId,
+        deviceName: await this.#getDeviceName(),
+        lastSeenAt: own.updatedAt ?? null,
+        fullySynced: (await this.#db.count(STORES.outbox)) === 0,
+        isSelf: true,
+      },
+    ];
+    for (const id of [...this.#listed].sort()) {
+      const head = this.#remoteHeads.get(id);
+      devices.push({
+        deviceId: id,
+        deviceName: head?.deviceName ?? '',
+        lastSeenAt: head?.updatedAt ?? null,
+        // A folder without a head has nothing to read; a malformed head cannot be read.
+        fullySynced:
+          head === undefined ? true : head !== null && (cursors.get(id) ?? 0) >= head.lastSeq,
+        isSelf: false,
+      });
+    }
+    this.#devices = devices;
   }
 
   /**
@@ -198,10 +333,13 @@ export class SyncEngine {
 
     /** @type {Map<string, DeviceHead>} */
     const heads = new Map();
+    this.#listed = new Set(remoteIds);
+    this.#remoteHeads = new Map();
     for (const remoteId of remoteIds) {
       const headText = await this.#transport.get(`devices/${remoteId}/head.json`);
       if (headText === null) continue;
       const head = parseHead(parseJson(headText), remoteId);
+      this.#remoteHeads.set(remoteId, head);
       if (!head) {
         issues.push(`devices/${remoteId}/head.json is malformed`);
         continue;
@@ -230,8 +368,13 @@ export class SyncEngine {
         }
         const fresh = parsed.ops.filter((op) => op.seq > cursor);
         // Having applied the checkpoint's last segment, every op the checkpoint covers is here.
+        // Only devices still on the server: a cursor for a removed device is never used.
         const frontier =
-          checkpoint && segment.endSeq === checkpoint.endSeq ? checkpoint.frontier : undefined;
+          checkpoint && segment.endSeq === checkpoint.endSeq
+            ? Object.fromEntries(
+                Object.entries(checkpoint.frontier).filter(([id]) => this.#listed.has(id)),
+              )
+            : undefined;
         const result = await this.#recorder.applyRemote(
           fresh,
           { deviceId: head.deviceId, lastSeq: segment.endSeq },
@@ -340,6 +483,7 @@ export class SyncEngine {
     let head = await this.#loadOwnHead();
     let pending = await this.#pendingCheckpoint();
     let pushed = 0;
+    let recreated = false;
     for (;;) {
       if (pending && head.lastSeq >= pending.endSeq) {
         // Crash recovery: the checkpoint's head went out, but the pending marker was not cleared.
@@ -368,7 +512,19 @@ export class SyncEngine {
       }
       const endSeq = ops[ops.length - 1].seq;
       const file = segmentFileName(startSeq, endSeq);
-      await this.#transport.put(`${this.#ownDir}/ops/${file}`, JSON.stringify(ops));
+      try {
+        await this.#transport.put(`${this.#ownDir}/ops/${file}`, JSON.stringify(ops));
+      } catch (error) {
+        if (recreated || !(error instanceof SyncError) || error.reason !== 'notFound') throw error;
+        // Our folder is gone: another device removed this one (§11). Recreate it and start over;
+        // when our head is gone too, the gap check above republishes the full state.
+        recreated = true;
+        await this.#transport.ensureCollection(`${this.#ownDir}/ops`);
+        this.#ownHead = null;
+        head = await this.#loadOwnHead();
+        if (head.lastSeq === 0) this.#republished = false;
+        continue;
+      }
       const completes = checkpoint !== null && endSeq === checkpoint.endSeq;
       const segments = [...head.segments, { file, startSeq, endSeq }];
       /** @type {DeviceHead} */

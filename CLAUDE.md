@@ -109,7 +109,9 @@ UPPER_SNAKE_CASE only for true constants, `onX` for callback props.
 
 ## Sync invariants
 
-- **Single writer per server folder**: a device writes only `devices/<ownDeviceId>/`.
+- **Single writer per server folder**: a device writes only `devices/<ownDeviceId>/`. Sole
+  exception: user-confirmed device removal deletes another device's folder after publishing a
+  checkpoint that contains its data (SYNC_PROTOCOL §11, D41).
 - **Atomic write path**: every entity mutation goes through `ChangeRecorder` — one IDB transaction
   ticks the HLC, merges fields + `_clocks`, increments `localSeq`, appends the op to `outbox`; the
   change feed is published after commit. No other code writes entity stores.

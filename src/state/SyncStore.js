@@ -1,8 +1,9 @@
-import { signal } from '@preact/signals-core';
+import { batch, signal } from '@preact/signals-core';
 import { createLoadState } from './loadState.js';
 
 /** @typedef {import('../core/ports/syncTransport.js').SyncControl} SyncControl */
 /** @typedef {import('../core/ports/syncTransport.js').SyncStatus} SyncStatus */
+/** @typedef {import('../core/ports/syncTransport.js').DeviceInfo} DeviceInfo */
 /** @typedef {import('../core/ports/credentialStore.js').WebDavCredentials} WebDavCredentials */
 /** @typedef {import('../core/errors.js').SyncFailureReason} SyncFailureReason */
 /** @typedef {import('../core/ports/changeFeed.js').ChangedEntity} ChangedEntity */
@@ -19,6 +20,7 @@ export class SyncStore {
 
   #control;
   #syncStatus;
+  #devices;
   #config = signal(/** @type {WebDavCredentials | null} */ (null));
   #load = createLoadState();
   /** @type {() => void} */
@@ -28,8 +30,12 @@ export class SyncStore {
   constructor({ syncControl }) {
     this.#control = syncControl;
     this.#syncStatus = signal(syncControl.getStatus());
+    this.#devices = signal(syncControl.listDevices());
     this.#unsubscribe = syncControl.subscribe((status) => {
-      this.#syncStatus.value = status;
+      batch(() => {
+        this.#syncStatus.value = status;
+        this.#devices.value = syncControl.listDevices();
+      });
     });
   }
 
@@ -51,6 +57,11 @@ export class SyncStore {
   /** @returns {ReadonlySignal<SyncStatus>} live sync state (idle, syncing, offline, error) */
   get syncStatus() {
     return this.#syncStatus;
+  }
+
+  /** @returns {ReadonlySignal<DeviceInfo[]>} devices in the vault as of the last cycle, this device first */
+  get devices() {
+    return this.#devices;
   }
 
   /** @returns {Promise<void>} */
@@ -89,6 +100,23 @@ export class SyncStore {
    */
   testConnection(credentials) {
     return this.#control.testConnection(credentials);
+  }
+
+  /**
+   * "Clean up server data". Never rejects; the outcome shows in `syncStatus`.
+   * @returns {Promise<void>}
+   */
+  compactNow() {
+    return this.#control.compactNow();
+  }
+
+  /**
+   * Removes another device from the sync folder.
+   * @param {string} deviceId
+   * @returns {Promise<void>} rejects with a SyncError (for example `removeIncomplete`)
+   */
+  removeDevice(deviceId) {
+    return this.#control.removeDevice(deviceId);
   }
 
   /**

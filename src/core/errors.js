@@ -65,7 +65,7 @@ export class BackupError extends AppError {
 /**
  * Reasons a sync cycle can fail. The UI maps each to a message telling the user how to fix it.
  * @typedef {'notConfigured' | 'offline' | 'network' | 'auth' | 'notFound' | 'server'
- *   | 'vaultTooNew' | 'malformed' | 'unknown'} SyncFailureReason
+ *   | 'vaultTooNew' | 'malformed' | 'removeIncomplete' | 'unknown'} SyncFailureReason
  */
 
 /** A sync operation failed for a known reason. */

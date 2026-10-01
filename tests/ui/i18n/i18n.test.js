@@ -56,6 +56,7 @@ describe('i18n', () => {
       'server',
       'vaultTooNew',
       'malformed',
+      'removeIncomplete',
       'unknown',
     ]) {
       expect(EN[`errors.sync.${reason}`]).toBeTruthy();

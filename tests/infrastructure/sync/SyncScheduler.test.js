@@ -28,7 +28,14 @@ function setup({ stored = /** @type {typeof creds | null} */ (creds) } = {}) {
   const resume = [];
   /** @type {Array<() => void>} */
   const pause = [];
-  const engine = { sync: vi.fn(async () => ok) };
+  const engine = {
+    sync: vi.fn(async () => ok),
+    compactNow: vi.fn(async () => ({ ...ok, compacted: true })),
+    removeDevice: vi.fn(async (/** @type {string} */ _id) => {}),
+    devices: vi.fn(() => [
+      { deviceId: 'me', deviceName: 'Me', lastSeenAt: null, fullySynced: true, isSelf: true },
+    ]),
+  };
   const client = {
     checkAccess: vi.fn(async () => {}),
     get: vi.fn(async () => /** @type {string | null} */ (null)),
@@ -79,6 +86,26 @@ describe('SyncScheduler', () => {
     await vi.advanceTimersByTimeAsync(INTERVAL_MS * 2);
     expect(engine.sync).not.toHaveBeenCalled();
     expect(scheduler.getStatus().state).toBe('disabled');
+  });
+
+  it('runs cleanup, lists devices, and removes a device with a follow-up sync', async () => {
+    const { scheduler, engine } = setup();
+    expect(scheduler.listDevices()).toEqual([]);
+    await scheduler.start();
+    expect(scheduler.listDevices().map((d) => d.deviceId)).toEqual(['me']);
+    await scheduler.compactNow();
+    expect(engine.compactNow).toHaveBeenCalledTimes(1);
+    expect(scheduler.getStatus().state).toBe('idle');
+    await scheduler.removeDevice('old');
+    expect(engine.removeDevice).toHaveBeenCalledWith('old');
+    expect(engine.sync).toHaveBeenCalledTimes(2);
+
+    engine.removeDevice.mockRejectedValueOnce(new SyncError('removeIncomplete'));
+    await expect(scheduler.removeDevice('old')).rejects.toMatchObject({
+      reason: 'removeIncomplete',
+    });
+    await scheduler.configure(null);
+    await expect(scheduler.removeDevice('old')).rejects.toMatchObject({ reason: 'notConfigured' });
   });
 
   it('reports blocked cleanup in the status without treating it as a sync error', async () => {

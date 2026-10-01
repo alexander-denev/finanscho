@@ -85,6 +85,10 @@ Press **Test connection** (it never writes anything), then **Save and sync**. Ev
 only to its own folder on the server, so devices can never overwrite each other's files. See
 [`docs/SYNC_PROTOCOL.md`](docs/SYNC_PROTOCOL.md).
 
+Each device compacts its history on the server automatically. **Settings → Devices** lists the
+devices in the sync folder: remove one you no longer use (its data stays on your other devices),
+or press **Clean up server data** to compact and delete old files now.
+
 ### Server requirements
 
 - WebDAV with `GET`, `PUT`, `MKCOL`, `PROPFIND` (Depth 0 and 1), and `DELETE`, and HTTP Basic

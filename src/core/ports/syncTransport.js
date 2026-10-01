@@ -37,6 +37,16 @@
  */
 
 /**
+ * A device in the vault, as of the last sync cycle.
+ * @typedef {object} DeviceInfo
+ * @property {string} deviceId
+ * @property {string} deviceName
+ * @property {string | null} lastSeenAt ISO time of its last published head
+ * @property {boolean} fullySynced every change it published is applied here (for this device: nothing waits to be published)
+ * @property {boolean} isSelf
+ */
+
+/**
  * @typedef {object} SyncControl
  * @property {() => SyncStatus} getStatus
  * @property {(listener: (status: SyncStatus) => void) => () => void} subscribe
@@ -44,6 +54,9 @@
  * @property {() => Promise<WebDavCredentials | null>} getConfig
  * @property {(credentials: WebDavCredentials | null) => Promise<void>} configure save (or clear) credentials and start/stop syncing
  * @property {(credentials: WebDavCredentials) => Promise<{ ok: true } | { ok: false, reason: SyncFailureReason }>} testConnection
+ * @property {() => DeviceInfo[]} listDevices devices seen in the last cycle (empty when sync is off)
+ * @property {(deviceId: string) => Promise<void>} removeDevice delete another device's folder; rejects with a SyncError (`removeIncomplete` when its changes are not all here yet)
+ * @property {() => Promise<void>} compactNow "Clean up server data": compact when it helps and delete superseded files
  */
 
 export {};

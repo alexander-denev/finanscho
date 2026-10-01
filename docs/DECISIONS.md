@@ -402,3 +402,27 @@ edit directly and fails with the plan's rule.
 Devices can differ in whether a tombstone still carries its older fields (a replica that pruned it
 may receive old field ops again). Visible data is identical; tests compare snapshots with every
 tombstone reduced to its stub. Remaining growth is about 150 bytes per deletion.
+
+### D41. Device removal: the single-writer exception
+
+Every reinstall leaves a dead `devices/<id>/` folder that every pull lists and every new device
+reads. Settings → Devices offers a user-confirmed **Remove** (SYNC_PROTOCOL §11):
+
+- It runs inside the sync mutex as part of a cycle (queued removal requests are settled there), so
+  it never interleaves with a pull or push. If the cycle fails, queued removals reject with the
+  cycle's error.
+- It is refused with `removeIncomplete` unless every op of that device is applied here and none
+  is deferred, then publishes a fresh, unconditional checkpoint (no size guard) before the
+  recursive `DELETE`. That checkpoint is what keeps the removed device's data available to
+  devices that had not read it yet.
+- Device removal is the only write outside a device's own folder: user-initiated, delete-only, and
+  only after the data is republished.
+- A removed device that is still alive recreates its folder on `notFound` (retrying once) and, its
+  head being gone, republishes its full state through the existing gap check. Deletes still win
+  because tombstones and stubs keep their clocks.
+- Checkpoint frontiers are filtered to listed devices when applied, so readers do not resurrect
+  cursors for removed devices (found by the third-device test).
+- The device list comes from the heads already fetched in the last pull (no extra requests).
+  "Inactive" means unseen for 90 days; the stronger warning applies within 7 days.
+- "Clean up server data" (`compactNow`) and the `cleanupBlocked` help (add `DELETE` to the CORS
+  methods) live in the same section.

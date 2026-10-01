@@ -142,6 +142,8 @@ export const EN = Object.freeze({
     'This sync folder was created by a newer version of Finanscho. Update the app to keep syncing.',
   'errors.sync.malformed':
     'The sync folder contains a damaged file. Other devices may need attention.',
+  'errors.sync.removeIncomplete':
+    'Not every change from that device has reached this one yet. Sync now, then try again.',
   'errors.sync.unknown': 'Sync failed unexpectedly. Try again.',
 
   'toast.transactionSaved': 'Transaction saved.',
@@ -161,6 +163,8 @@ export const EN = Object.freeze({
   'toast.exported': 'Backup saved as {file}.',
   'toast.imported': 'Backup imported. {count} records updated.',
   'toast.offlineReady': 'Finanscho now works offline.',
+  'toast.deviceRemoved': 'Removed {name} from the sync folder.',
+  'toast.cleanedUp': 'Server data cleaned up.',
   'toast.installed': 'Finanscho is installed. Open it from your home screen or app list.',
 
   'dashboard.title': 'Dashboard',
@@ -334,6 +338,28 @@ export const EN = Object.freeze({
   'settings.syncNow': 'Sync now',
   'settings.disconnect': 'Turn off sync',
   'settings.syncStatus': 'Status',
+  'settings.devices.title': 'Devices',
+  'settings.devices.intro':
+    'Devices that sync with this folder. Remove a device you no longer use; its data stays on your other devices.',
+  'settings.devices.thisDevice': 'This device',
+  'settings.devices.unnamed': 'Unnamed device',
+  'settings.devices.inactive': 'Inactive',
+  'settings.devices.lastSeen': 'Last synced {time}',
+  'settings.devices.neverSeen': 'Hasn’t synced yet',
+  'settings.devices.behind': 'Some of its changes haven’t reached this device yet',
+  'settings.devices.remove': 'Remove',
+  'settings.devices.removeTitle': 'Remove {name}?',
+  'settings.devices.removeBody':
+    'Its folder is deleted from the server. Everything it synced stays, because this device keeps a full copy and publishes it first.',
+  'settings.devices.removeRecent':
+    'It synced in the last 7 days. If it’s still in use, it will upload all its data again the next time it syncs.',
+  'settings.devices.removeConfirm': 'Remove device',
+  'settings.devices.cleanUp': 'Clean up server data',
+  'settings.devices.cleaning': 'Cleaning up…',
+  'settings.devices.cleanUpHelp':
+    'Compacts this device’s history on the server and deletes files it no longer needs. This happens automatically too.',
+  'settings.devices.cleanupBlocked':
+    'Your server didn’t allow Finanscho to delete old files, so they still take up space. Sync works normally. To fix it, add DELETE to the methods the server allows for cross-origin requests (CORS).',
   'settings.backup': 'Backup',
   'settings.backupIntro':
     'Export everything to a JSON file you can keep somewhere safe. Importing a backup merges it with the data on this device.',

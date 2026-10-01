@@ -72,6 +72,7 @@ SyncScheduler ──► SyncEngine.sync()  (mutex; pull then push)
     ──► ChangeFeed.publish({ source: 'remote' })  → the same store invalidation path
     push: segment PUT → head PUT → outbox trim
     maintenance: compaction when due (checkpoint → trimmed head) → delete own superseded files
+    device removal (user-confirmed): full pull → checkpoint → DELETE devices/<id>/
 ```
 
 Stores never know about sync; they only react to the change feed.

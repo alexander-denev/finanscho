@@ -158,7 +158,8 @@ that merges every op, advances the HLC (`receive`), and advances that device's c
 - `vault.json` is created (by `PUT`) only if absent. It is the only shared file and is written at
   most once per vault; racing creators write identical content, so the race is harmless.
 - Each device writes **only inside `devices/<its deviceId>/`**. Write conflicts on the server are
-  impossible.
+  impossible. The one exception is **removing a device** (§11): user-initiated, and it only ever
+  deletes another device's folder.
 - Segment names use seqs zero-padded to 12 digits, e.g. `000000000001-000000000500.json`.
 - `head.json`:
 
@@ -393,3 +394,34 @@ same. Tests compare snapshots with tombstones reduced to stubs.
 | After a checkpoint segment PUT, before its head PUT | The head still lists the old segments; the checkpoint ops are still in the outbox and `pendingCheckpoint` is set. The next push rewrites the segment and head. |
 | After the checkpoint head PUT, before the trim      | The next push sees `lastSeq ≥ endSeq`, clears `pendingCheckpoint`, sets `gcPending`, and trims the outbox without re-uploading.                                |
 | During cleanup                                      | `gcPending` is still set; the next cycle lists `ops/` again and deletes what is left.                                                                          |
+
+## 11. Removing a device
+
+Every reinstall or retired browser leaves a `devices/<id>/` folder behind. Settings → Devices
+lists the devices of the vault (from the heads read in the last pull: name, last head update,
+whether everything it published is applied here) and offers **Remove**, after a confirmation that
+warns more strongly when the device synced in the last 7 days.
+
+`SyncEngine.removeDevice(id)` runs inside the sync mutex, as part of a cycle:
+
+1. Run a full pull (and push).
+2. Require that our cursor for the device equals its head's `lastSeq` (its head is readable) and
+   that none of its ops are deferred here. Otherwise reject with `removeIncomplete` and change
+   nothing.
+3. Queue a checkpoint (§10.1) and push until its head is published. Our checkpoint now contains
+   all of the removed device's surviving data.
+4. `DELETE devices/<id>/` (a collection `DELETE` is recursive, RFC 4918 §9.6).
+5. Drop its cursor.
+
+Readers that had not finished reading the removed device get its data through our new checkpoint:
+its seqs are above every reader's cursor for us. Frontier entries for devices no longer listed
+are ignored.
+
+**This is the single-writer exception.** It is user-initiated, it only ever deletes, and the
+data it deletes is already republished by the remover.
+
+**A removed device that is still in use.** Its next segment `PUT` fails with `409`/`404`
+(`notFound`). The device recreates its folder and retries once; its own head is gone, so the gap
+check (§8, "Changing vaults") republishes its full state, and it re-reads all devices. Merge makes
+this safe, and tombstones (stubs included) make sure deletes made in the meantime still win. A
+restarted engine recreates the folder in `prepare` and republishes on its next push the same way.

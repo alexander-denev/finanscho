@@ -9,6 +9,7 @@ import { SyncStore } from '../../src/state/SyncStore.js';
 import { ToastStore } from '../../src/state/ToastStore.js';
 import { InstallStore } from '../../src/state/InstallStore.js';
 import { bindStoreInvalidation } from '../../src/app/storeInvalidation.js';
+import { SyncError } from '../../src/core/errors.js';
 import { createTestServices } from './testServices.js';
 import { FakeInstallEnvironment } from './FakeInstallEnvironment.js';
 
@@ -16,7 +17,12 @@ import { FakeInstallEnvironment } from './FakeInstallEnvironment.js';
 
 /**
  * A SyncControl stand-in that records calls.
- * @returns {import('../../src/core/ports/syncTransport.js').SyncControl & { calls: string[], emit: (s: Partial<SyncStatus>) => void }}
+ * @returns {import('../../src/core/ports/syncTransport.js').SyncControl & {
+ *   calls: string[],
+ *   emit: (s: Partial<SyncStatus>) => void,
+ *   setDevices: (list: import('../../src/core/ports/syncTransport.js').DeviceInfo[]) => void,
+ *   refuseRemovals: (refuse: boolean) => void,
+ * }}
  */
 export function createFakeSyncControl() {
   /** @type {SyncStatus} */
@@ -34,6 +40,9 @@ export function createFakeSyncControl() {
   let config = null;
   /** @type {string[]} */
   const calls = [];
+  /** @type {import('../../src/core/ports/syncTransport.js').DeviceInfo[]} */
+  let devices = [];
+  let refuseRemoval = false;
   return {
     calls,
     emit(changes) {
@@ -58,6 +67,25 @@ export function createFakeSyncControl() {
     async testConnection(c) {
       calls.push('test');
       return c.password === 'right' ? { ok: true } : { ok: false, reason: 'auth' };
+    },
+    listDevices: () => devices,
+    async removeDevice(deviceId) {
+      calls.push(`remove:${deviceId}`);
+      if (refuseRemoval) throw new SyncError('removeIncomplete');
+      devices = devices.filter((d) => d.deviceId !== deviceId);
+      for (const l of listeners) l(status);
+    },
+    async compactNow() {
+      calls.push('compactNow');
+    },
+    /** @param {import('../../src/core/ports/syncTransport.js').DeviceInfo[]} list */
+    setDevices(list) {
+      devices = list;
+      for (const l of listeners) l(status);
+    },
+    /** @param {boolean} refuse */
+    refuseRemovals(refuse) {
+      refuseRemoval = refuse;
     },
   };
 }

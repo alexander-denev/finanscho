@@ -15,6 +15,7 @@ import { VAULT_FORMAT } from './SyncEngine.js';
 /** @typedef {import('../../core/ports/repositories.js').SettingsRepository} SettingsRepository */
 /** @typedef {import('../../core/errors.js').SyncFailureReason} SyncFailureReason */
 /** @typedef {import('./SyncEngine.js').SyncResult} SyncResult */
+/** @typedef {import('../../core/ports/syncTransport.js').DeviceInfo} DeviceInfo */
 
 export const DEBOUNCE_MS = 5_000;
 export const INTERVAL_MS = 5 * 60_000;
@@ -33,11 +34,20 @@ const SYNCED_VAULT_KEY = 'syncedVault';
  */
 
 /**
+ * The parts of SyncEngine the scheduler uses.
+ * @typedef {object} SchedulerEngine
+ * @property {() => Promise<SyncResult>} sync
+ * @property {() => Promise<SyncResult>} compactNow
+ * @property {(deviceId: string) => Promise<void>} removeDevice
+ * @property {() => DeviceInfo[]} devices
+ */
+
+/**
  * @typedef {object} SchedulerDeps
  * @property {CredentialStore} credentials
  * @property {SettingsRepository} settings
  * @property {ChangeFeed} changeFeed
- * @property {(credentials: WebDavCredentials) => { sync: () => Promise<SyncResult> }} createEngine
+ * @property {(credentials: WebDavCredentials) => SchedulerEngine} createEngine
  * @property {(credentials: WebDavCredentials) => { checkAccess: () => Promise<void>, get: (path: string) => Promise<string | null> }} createClient
  * @property {() => Promise<unknown>} onVaultChange re-queue all data before syncing with a different vault
  * @property {{ onResume: (fn: () => void) => () => void, onPause: (fn: () => void) => () => void }} lifecycle
@@ -68,7 +78,7 @@ function reasonOf(error) {
 export class SyncScheduler {
   #deps;
   #timers;
-  /** @type {{ sync: () => Promise<SyncResult> } | null} */
+  /** @type {SchedulerEngine | null} */
   #engine = null;
   /** @type {SyncStatus} */
   #status = {
@@ -208,14 +218,49 @@ export class SyncScheduler {
    * Runs a sync cycle now (coalesced with a running one). Never rejects; failures go to status.
    * @returns {Promise<void>}
    */
-  async syncNow() {
+  syncNow() {
+    return this.#run((engine) => engine.sync());
+  }
+
+  /**
+   * "Clean up server data": a cycle that compacts this device's log when that makes it smaller
+   * and deletes superseded files. Never rejects; failures go to status.
+   * @returns {Promise<void>}
+   */
+  compactNow() {
+    return this.#run((engine) => engine.compactNow());
+  }
+
+  /** @returns {DeviceInfo[]} */
+  listDevices() {
+    return this.#engine?.devices() ?? [];
+  }
+
+  /**
+   * Removes another device's folder from the vault, then syncs to refresh status and devices.
+   * @param {string} deviceId
+   * @returns {Promise<void>} rejects with a SyncError, e.g. `removeIncomplete`
+   */
+  async removeDevice(deviceId) {
+    const engine = this.#engine;
+    if (!engine) throw new SyncError('notConfigured', 'Sync is not configured');
+    await engine.removeDevice(deviceId);
+    await this.syncNow();
+  }
+
+  /**
+   * Runs one engine operation with status updates and backoff on transient failures.
+   * @param {(engine: SchedulerEngine) => Promise<SyncResult>} operation
+   * @returns {Promise<void>}
+   */
+  async #run(operation) {
     const engine = this.#engine;
     if (!engine) return;
     this.#debounced.cancel();
     this.#clearRetry();
     this.#update({ state: 'syncing', reason: null });
     try {
-      const result = await engine.sync();
+      const result = await operation(engine);
       if (engine !== this.#engine) return;
       const now = this.#deps.nowIso();
       this.#failures = 0;
