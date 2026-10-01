@@ -13,6 +13,7 @@ import { useContext } from 'preact/hooks';
  * @property {import('../../state/SettingsStore.js').SettingsStore} settings
  * @property {import('../../state/SyncStore.js').SyncStore} sync
  * @property {import('../../state/ToastStore.js').ToastStore} toasts
+ * @property {import('../../state/InstallStore.js').InstallStore} install
  * @property {import('../router/hashRouter.js').HashRouter} router
  * @property {{ today: () => string, nowMs: () => number }} clock read-only clock for defaults and relative times
  */

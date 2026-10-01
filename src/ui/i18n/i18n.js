@@ -102,6 +102,27 @@ export function formatRelativeTime(iso, nowMs) {
 }
 
 /**
+ * A byte count in decimal units, as browsers report storage ("2.5 MB").
+ * @param {number} bytes
+ * @returns {string}
+ */
+export function formatBytes(bytes) {
+  const units = /** @type {const} */ (['byte', 'kilobyte', 'megabyte', 'gigabyte', 'terabyte']);
+  let value = Math.max(0, bytes);
+  let index = 0;
+  while (value >= 1000 && index < units.length - 1) {
+    value /= 1000;
+    index += 1;
+  }
+  return new Intl.NumberFormat(getLocale(), {
+    style: 'unit',
+    unit: units[index],
+    unitDisplay: 'short',
+    maximumFractionDigits: index === 0 ? 0 : 1,
+  }).format(value);
+}
+
+/**
  * @param {number} value
  * @returns {string}
  */

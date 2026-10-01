@@ -3,6 +3,7 @@ import { checkRequiredText, throwIfInvalid } from '../domain/validation.js';
 
 /** @typedef {import('../ports/repositories.js').SettingsRepository} SettingsRepository */
 /** @typedef {import('../ports/repositories.js').DeviceRepository} DeviceRepository */
+/** @typedef {import('../ports/clock.js').Clock} Clock */
 
 export const THEMES = /** @type {const} */ (['system', 'light', 'dark']);
 
@@ -14,14 +15,21 @@ export const THEMES = /** @type {const} */ (['system', 'light', 'dark']);
  * @property {string} defaultCurrency
  * @property {Theme} theme
  * @property {string} deviceName
- * @property {boolean} storageNoticeDismissed
+ */
+
+/**
+ * When the user last snoozed the install recommendation, and how often.
+ * @typedef {object} InstallNoticeState
+ * @property {string | null} dismissedAt ISO time of the last "Not now"
+ * @property {number} dismissCount
  */
 
 /** Keys in the settings repository. */
 export const SETTING_KEYS = /** @type {const} */ ({
   defaultCurrency: 'defaultCurrency',
   theme: 'theme',
-  storageNoticeDismissed: 'storageNoticeDismissed',
+  installNoticeDismissedAt: 'installNoticeDismissedAt',
+  installNoticeDismissCount: 'installNoticeDismissCount',
   lastAccountId: 'lastAccountId',
   categoriesSeeded: 'categoriesSeeded',
 });
@@ -30,19 +38,20 @@ export const SETTING_KEYS = /** @type {const} */ ({
 export class SettingsService {
   #settings;
   #device;
+  #clock;
 
-  /** @param {{ settings: SettingsRepository, device: DeviceRepository }} deps */
-  constructor({ settings, device }) {
+  /** @param {{ settings: SettingsRepository, device: DeviceRepository, clock: Clock }} deps */
+  constructor({ settings, device, clock }) {
     this.#settings = settings;
     this.#device = device;
+    this.#clock = clock;
   }
 
   /** @returns {Promise<Settings>} */
   async load() {
-    const [currency, theme, dismissed, deviceName] = await Promise.all([
+    const [currency, theme, deviceName] = await Promise.all([
       this.#settings.get(SETTING_KEYS.defaultCurrency),
       this.#settings.get(SETTING_KEYS.theme),
-      this.#settings.get(SETTING_KEYS.storageNoticeDismissed),
       this.#device.getDeviceName(),
     ]);
     return {
@@ -51,7 +60,6 @@ export class SettingsService {
         ? /** @type {Theme} */ (theme)
         : 'system',
       deviceName,
-      storageNoticeDismissed: dismissed === true,
     };
   }
 
@@ -85,8 +93,30 @@ export class SettingsService {
     await this.#device.setDeviceName(name.trim());
   }
 
-  /** @returns {Promise<void>} */
-  async dismissStorageNotice() {
-    await this.#settings.set(SETTING_KEYS.storageNoticeDismissed, true);
+  /** @returns {Promise<InstallNoticeState>} */
+  async loadInstallNotice() {
+    const [dismissedAt, dismissCount] = await Promise.all([
+      this.#settings.get(SETTING_KEYS.installNoticeDismissedAt),
+      this.#settings.get(SETTING_KEYS.installNoticeDismissCount),
+    ]);
+    return {
+      dismissedAt: typeof dismissedAt === 'string' ? dismissedAt : null,
+      dismissCount:
+        typeof dismissCount === 'number' && Number.isSafeInteger(dismissCount) && dismissCount > 0
+          ? dismissCount
+          : 0,
+    };
+  }
+
+  /**
+   * Snoozes the install recommendation from now and counts the dismissal.
+   * @returns {Promise<InstallNoticeState>} the new state
+   */
+  async dismissInstallNotice() {
+    const { dismissCount } = await this.loadInstallNotice();
+    const next = { dismissedAt: this.#clock.nowIso(), dismissCount: dismissCount + 1 };
+    await this.#settings.set(SETTING_KEYS.installNoticeDismissedAt, next.dismissedAt);
+    await this.#settings.set(SETTING_KEYS.installNoticeDismissCount, next.dismissCount);
+    return next;
   }
 }

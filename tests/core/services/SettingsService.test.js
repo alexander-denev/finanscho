@@ -8,17 +8,32 @@ describe('SettingsService', () => {
       defaultCurrency: 'EUR',
       theme: 'system',
       deviceName: '',
-      storageNoticeDismissed: false,
     });
     await services.settings.setDefaultCurrency('usd');
     await services.settings.setTheme('dark');
     await services.settings.setDeviceName('  Phone ');
-    await services.settings.dismissStorageNotice();
     expect(await services.settings.load()).toEqual({
       defaultCurrency: 'USD',
       theme: 'dark',
       deviceName: 'Phone',
-      storageNoticeDismissed: true,
+    });
+  });
+
+  it('records install-notice snoozes with the time and a count', async () => {
+    const { services, clock } = await createTestServices();
+    expect(await services.settings.loadInstallNotice()).toEqual({
+      dismissedAt: null,
+      dismissCount: 0,
+    });
+    expect(await services.settings.dismissInstallNotice()).toEqual({
+      dismissedAt: '2024-05-15T10:00:00.000Z',
+      dismissCount: 1,
+    });
+    clock.advanceDays(20);
+    await services.settings.dismissInstallNotice();
+    expect(await services.settings.loadInstallNotice()).toEqual({
+      dismissedAt: '2024-06-04T10:00:00.000Z',
+      dismissCount: 2,
     });
   });
 

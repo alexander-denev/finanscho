@@ -9,15 +9,11 @@ describe('SettingsStore', () => {
     await settings.setTheme('dark');
     await settings.setDeviceName('Laptop');
     await settings.setDefaultCurrency('chf');
-    await settings.dismissStorageNotice();
     expect(settings.values.value).toEqual({
       theme: 'dark',
       deviceName: 'Laptop',
       defaultCurrency: 'CHF',
-      storageNoticeDismissed: true,
     });
-    settings.setStoragePersisted(true);
-    expect(settings.storagePersisted.value).toBe(true);
 
     await t.stores.accounts.create({
       name: 'Main',

@@ -56,7 +56,8 @@ files — import each module from its own file, with the extension.
 - `app`: `createContainer.js` builds infrastructure → services → stores, binds store
   invalidation to the change feed (`storeInvalidation.js`), starts sync/midnight timers.
 - Store signals: `AccountsStore.items/active/archived/totals/byId`, `TransactionsStore.days/total`,
-  `BudgetsStore.data/totals`, `SyncStore.syncStatus` (live sync state) + `config`.
+  `BudgetsStore.data/totals`, `SyncStore.syncStatus` (live sync state) + `config`,
+  `InstallStore.installed/canPrompt/guidance/persisted/showBanner` (install + storage protection).
 - Feature folders: `ui/features/<feature>/` hold the page + feature-specific components. A
   component used by two or more features moves to `ui/components` and becomes feature-agnostic.
 

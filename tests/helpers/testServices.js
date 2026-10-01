@@ -48,7 +48,7 @@ export async function createTestServices(options = {}) {
     clock,
   });
   const backup = new BackupService({ backup: repos.backup, clock });
-  const settings = new SettingsService({ settings: repos.settings, device: repos.device });
+  const settings = new SettingsService({ settings: repos.settings, device: repos.device, clock });
   return {
     ...env,
     ids,

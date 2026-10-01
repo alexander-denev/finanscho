@@ -4,6 +4,7 @@ import { useStores } from '../ui/context/StoresProvider.jsx';
 import { Icon } from '../ui/components/Icon.jsx';
 import { Toast } from '../ui/components/Toast.jsx';
 import { SyncIndicator } from '../ui/features/settings/SyncIndicator.jsx';
+import { InstallBanner } from '../ui/features/install/InstallBanner.jsx';
 import { t } from '../ui/i18n/i18n.js';
 import styles from './AppShell.module.css';
 
@@ -48,7 +49,8 @@ function isActive(item, current) {
 
 /**
  * Layout: bottom tab bar with a floating add button below 1024 px, persistent sidebar from
- * 1024 px (switched by CSS media queries). Hosts the sync indicator and toasts.
+ * 1024 px (switched by CSS media queries). Hosts the sync indicator, the install recommendation,
+ * and toasts.
  * @param {AppShellProps} props
  * @returns {import('preact').JSX.Element}
  */
@@ -106,6 +108,7 @@ export function AppShell({ onAddTransaction, children }) {
         <div className={styles.syncNarrow}>
           <SyncIndicator />
         </div>
+        <InstallBanner />
         {children}
       </main>
       <button

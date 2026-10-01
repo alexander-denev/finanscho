@@ -7,8 +7,10 @@ import { DashboardStore } from '../../src/state/DashboardStore.js';
 import { SettingsStore } from '../../src/state/SettingsStore.js';
 import { SyncStore } from '../../src/state/SyncStore.js';
 import { ToastStore } from '../../src/state/ToastStore.js';
+import { InstallStore } from '../../src/state/InstallStore.js';
 import { bindStoreInvalidation } from '../../src/app/storeInvalidation.js';
 import { createTestServices } from './testServices.js';
+import { FakeInstallEnvironment } from './FakeInstallEnvironment.js';
 
 /** @typedef {import('../../src/core/ports/syncTransport.js').SyncStatus} SyncStatus */
 
@@ -55,20 +57,22 @@ export function createFakeSyncControl() {
 
 /**
  * Real services on fake-indexeddb, real stores, and change-feed invalidation — the same wiring as
- * the composition root, minus sync.
- * @param {Parameters<typeof createTestServices>[0]} [options]
+ * the composition root, minus sync. `installEnvironment` is a controllable fake.
+ * @param {Parameters<typeof createTestServices>[0] & { installEnvironment?: FakeInstallEnvironment }} [options]
  */
-export async function createTestStores(options) {
+export async function createTestStores(options = {}) {
   const t = await createTestServices(options);
   await t.services.categories.seedDefaults();
+  const installEnvironment = options.installEnvironment ?? new FakeInstallEnvironment();
   const accounts = new AccountsStore({ accountService: t.services.accounts });
+  const transactions = new TransactionsStore({
+    transactionService: t.services.transactions,
+    accountsStore: accounts,
+  });
   const stores = {
     accounts,
     categories: new CategoriesStore({ categoryService: t.services.categories }),
-    transactions: new TransactionsStore({
-      transactionService: t.services.transactions,
-      accountsStore: accounts,
-    }),
+    transactions,
     budgets: new BudgetsStore({ budgetService: t.services.budgets, clock: t.clock }),
     recurring: new RecurringStore({ recurringService: t.services.recurring }),
     dashboard: new DashboardStore({ dashboardService: t.services.dashboard }),
@@ -78,6 +82,13 @@ export async function createTestStores(options) {
     }),
     sync: new SyncStore({ syncControl: createFakeSyncControl() }),
     toasts: new ToastStore(),
+    install: new InstallStore({
+      environment: installEnvironment,
+      settingsService: t.services.settings,
+      accountsStore: accounts,
+      transactionsStore: transactions,
+      clock: t.clock,
+    }),
   };
   const unbind = bindStoreInvalidation(t.feed, [
     { store: stores.accounts, dependsOn: AccountsStore.DEPENDS_ON },
@@ -96,6 +107,7 @@ export async function createTestStores(options) {
     stores.dashboard.load(),
     stores.settings.load(),
     stores.sync.load(),
+    stores.install.load(),
   ]);
   /** Waits for every store's pending reloads. */
   const settled = () =>
@@ -107,6 +119,7 @@ export async function createTestStores(options) {
       stores.recurring.settled(),
       stores.dashboard.settled(),
       stores.settings.settled(),
+      stores.install.settled(),
     ]);
-  return { ...t, stores, settled, unbind };
+  return { ...t, stores, settled, unbind, installEnvironment };
 }

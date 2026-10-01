@@ -1,0 +1,14 @@
+.root {
+  margin-bottom: var(--sp-4);
+}
+
+.title {
+  font-weight: var(--fw-strong);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   errorMessage,
+  formatBytes,
   formatDate,
   formatMonth,
   formatRelativeTime,
@@ -25,6 +26,13 @@ describe('i18n', () => {
     const now = Date.parse('2024-05-15T10:00:00Z');
     expect(formatRelativeTime('2024-05-15T09:55:00Z', now)).toBe('5 minutes ago');
     expect(formatRelativeTime('2024-05-14T10:00:00Z', now)).toBe('yesterday');
+  });
+
+  it('formats byte counts in decimal units', () => {
+    expect(formatBytes(0)).toBe('0 byte');
+    expect(formatBytes(950)).toBe('950 byte');
+    expect(formatBytes(2_500_000)).toBe('2.5 MB');
+    expect(formatBytes(1_000_000_000)).toBe('1 GB');
   });
 
   it('maps errors to user-readable messages and never shows raw text', () => {

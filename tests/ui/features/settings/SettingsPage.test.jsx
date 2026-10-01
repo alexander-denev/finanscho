@@ -18,13 +18,13 @@ describe('SettingsPage', () => {
     expect(ui.stores.settings.values.value.defaultCurrency).toBe('CHF');
   });
 
-  it('shows the storage notice once and explains CORS for sync', async () => {
+  it('starts with app and storage status and explains CORS for sync', async () => {
     const ui = await createUiStores({ path: '/settings' });
     renderWithStores(<SettingsPage />, ui.stores);
-    expect(screen.getByText('Keep a copy of your data')).toBeTruthy();
+    const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+    expect(headings[0]).toBe('App and storage');
+    expect(screen.getByRole('button', { name: 'Protect my data' })).toBeTruthy();
     expect(screen.getByText(/must allow cross-origin requests \(CORS\)/)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
-    await waitFor(() => expect(screen.queryByText('Keep a copy of your data')).toBeNull());
   });
 
   it('tests the connection and saves sync settings', async () => {

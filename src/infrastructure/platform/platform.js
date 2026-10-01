@@ -3,14 +3,9 @@
  * instructions, never to switch features on or off (feature-detect instead).
  */
 
-/** @typedef {'ios' | 'android' | 'desktop'} PlatformOs */
-/** @typedef {'safari' | 'chromium' | 'firefox' | 'other'} PlatformBrowser */
-
-/**
- * @typedef {object} Platform
- * @property {PlatformOs} os
- * @property {PlatformBrowser} browser
- */
+/** @typedef {import('../../core/ports/installEnvironment.js').Platform} Platform */
+/** @typedef {import('../../core/ports/installEnvironment.js').PlatformOs} PlatformOs */
+/** @typedef {import('../../core/ports/installEnvironment.js').PlatformBrowser} PlatformBrowser */
 
 /**
  * The parts of `navigator` that detection reads. `userAgentData` (UA Client Hints) exists only in

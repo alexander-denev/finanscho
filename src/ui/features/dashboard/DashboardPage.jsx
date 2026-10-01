@@ -3,6 +3,7 @@ import { Amount } from '../../components/Amount.jsx';
 import { BalanceList } from '../../components/BalanceList.jsx';
 import { ButtonLink } from '../../components/ButtonLink.jsx';
 import { EmptyState } from '../../components/EmptyState.jsx';
+import { InlineMessage } from '../../components/InlineMessage.jsx';
 import { PageHeader } from '../../components/PageHeader.jsx';
 import { ProgressBar } from '../../components/ProgressBar.jsx';
 import { UpcomingList } from '../../components/UpcomingList.jsx';
@@ -15,7 +16,7 @@ import styles from './DashboardPage.module.css';
  * @returns {import('preact').JSX.Element}
  */
 export function DashboardPage() {
-  const { dashboard, categories, accounts } = useStores();
+  const { dashboard, categories, accounts, install } = useStores();
   const summary = dashboard.summary.value;
   const categoryById = categories.byId.value;
   const accountById = accounts.byId.value;
@@ -33,6 +34,19 @@ export function DashboardPage() {
     return (
       <>
         <PageHeader title={t('dashboard.title')} />
+        {install.showFreshInstallHint.value && (
+          <div className={styles.hint}>
+            <InlineMessage>
+              <p className={styles.hintTitle}>{t('install.freshHint.title')}</p>
+              <p>{t('install.freshHint.body')}</p>
+              <div className={styles.hintAction}>
+                <ButtonLink href="#/settings" icon="settings">
+                  {t('install.freshHint.action')}
+                </ButtonLink>
+              </div>
+            </InlineMessage>
+          </div>
+        )}
         <EmptyState
           title={t('dashboard.empty.title')}
           body={t('dashboard.empty.body')}

@@ -1,0 +1,37 @@
+.title {
+  font-weight: var(--fw-strong);
+}
+
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-4);
+}
+
+.fact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.fact dt {
+  font-weight: var(--fw-strong);
+}
+
+.fact dd {
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+
+.help {
+  max-width: var(--measure);
+  color: var(--c-muted);
+  font-size: var(--fs-sm);
+}

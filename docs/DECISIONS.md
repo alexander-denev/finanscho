@@ -311,3 +311,38 @@ a production build with demo data (390×844 at 2× and 1440×900), taken with he
 maskable icon is a separate file with the artwork scaled to 80% so it stays inside the safe zone.
 Plan numbering note: decisions are numbered in the order they ship, so the plan's D41 is D37 and
 its D37–D40 are D38–D41.
+
+### D38. Install recommendation and persistence policy
+
+Without a native shell IndexedDB is the only store, and browsers can evict it. Persistence is much
+more likely for installed PWAs, so the app recommends installing and shows how well data is
+protected.
+
+- **Port and adapter.** `core/ports/installEnvironment.js` (display mode, install prompt,
+  `appinstalled`, platform, `navigator.storage` with `null` for "unsupported") is implemented by
+  `BrowserInstallEnvironment`, which takes `window` so tests pass a fake. It is created first in
+  the composition root so an early `beforeinstallprompt` is captured (`preventDefault()`, kept for
+  our own "Install" button). The `Platform` typedefs moved into the port.
+- **When to recommend.** `InstallStore.showBanner` is true when the app is not installed, the user
+  has real data (any account or transaction; accounts are never seeded), it is not snoozed
+  (14 days after "Not now"), and it was dismissed fewer than 3 times. The snooze lives in settings
+  (`installNoticeDismissedAt`, `installNoticeDismissCount`, via
+  `SettingsService.loadInstallNotice/dismissInstallNotice`, which now takes the clock). It replaces
+  `storageNoticeDismissed` and `SettingsStore.storagePersisted`.
+- **Persistence.** At startup the store reads `persisted()` and calls `persist()` silently only
+  when installed or in Chromium/Safari, which never prompt. Firefox shows a permission prompt and
+  needs a user gesture, so it waits for "Protect my data". `persist()` runs again on install
+  accept and on `appinstalled`.
+- **Guidance.** `prompt` (browser offered one), `iosSafari`, `iosOtherBrowser` (open in Safari
+  first), `firefoxDesktop` (cannot install; protect data or use another browser), `manual`.
+  The iOS and other-browser cases warn that data does not move and offer the existing backup
+  export first; elsewhere the dialog says data carries over.
+- **iOS fresh install.** A standalone iOS app with no data shows a hint (Settings and the dashboard
+  empty state) to import the backup or turn on sync. It disappears as soon as data exists, so it
+  needs no stored "seen" flag.
+- **Placement deviations from the plan.** `InstallInstructionsDialog` is used by two features
+  (install banner, settings), so per the file rules it lives in `ui/components` as a
+  presentational component; `ui/hooks/useInstallFlow.js` wires it to the stores for both. The
+  backup download moved from `BackupSettings` into `ui/hooks/useBackupExport.js` for the same
+  reason. The banner's buttons sit under the text rather than in `InlineMessage`'s side action
+  slot, which squeezed the text into a narrow column on phones (seen in a headless-Edge capture).

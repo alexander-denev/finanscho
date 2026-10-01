@@ -59,3 +59,15 @@
   gap: var(--sp-1);
   font-size: var(--fs-sm);
 }
+
+.hint {
+  margin-bottom: var(--sp-4);
+}
+
+.hintTitle {
+  font-weight: var(--fw-strong);
+}
+
+.hintAction {
+  margin-top: var(--sp-3);
+}

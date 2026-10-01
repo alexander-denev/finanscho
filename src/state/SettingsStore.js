@@ -16,10 +16,9 @@ const DEFAULTS = {
   defaultCurrency: 'EUR',
   theme: 'system',
   deviceName: '',
-  storageNoticeDismissed: false,
 };
 
-/** Device-local preferences, storage durability, and backup export/import. */
+/** Device-local preferences and backup export/import. */
 export class SettingsStore {
   /** @type {ReadonlyArray<ChangedEntity>} */
   static DEPENDS_ON = [];
@@ -27,7 +26,6 @@ export class SettingsStore {
   #settings;
   #backup;
   #values = signal(DEFAULTS);
-  #storagePersisted = signal(/** @type {boolean | null} */ (null));
   #load = createLoadState();
 
   /** @param {{ settingsService: SettingsService, backupService: BackupService }} deps */
@@ -39,11 +37,6 @@ export class SettingsStore {
   /** @returns {ReadonlySignal<Settings>} */
   get values() {
     return this.#values;
-  }
-
-  /** @returns {ReadonlySignal<boolean | null>} whether the browser granted persistent storage (null = unknown/unsupported) */
-  get storagePersisted() {
-    return this.#storagePersisted;
   }
 
   /** @returns {ReadonlySignal<import('./loadState.js').LoadStatus>} */
@@ -77,15 +70,6 @@ export class SettingsStore {
   }
 
   /**
-   * Records the result of `navigator.storage.persist()` (set by the composition root).
-   * @param {boolean | null} persisted
-   * @returns {void}
-   */
-  setStoragePersisted(persisted) {
-    this.#storagePersisted.value = persisted;
-  }
-
-  /**
    * @param {string} theme
    * @returns {Promise<void>}
    */
@@ -109,12 +93,6 @@ export class SettingsStore {
    */
   async setDeviceName(name) {
     await this.#settings.setDeviceName(name);
-    await this.load();
-  }
-
-  /** @returns {Promise<void>} */
-  async dismissStorageNotice() {
-    await this.#settings.dismissStorageNotice();
     await this.load();
   }
 

@@ -161,6 +161,7 @@ export const EN = Object.freeze({
   'toast.exported': 'Backup saved as {file}.',
   'toast.imported': 'Backup imported. {count} records updated.',
   'toast.offlineReady': 'Finanscho now works offline.',
+  'toast.installed': 'Finanscho is installed. Open it from your home screen or app list.',
 
   'dashboard.title': 'Dashboard',
   'dashboard.netWorth': 'Total balance',
@@ -339,12 +340,57 @@ export const EN = Object.freeze({
   'settings.export': 'Export backup',
   'settings.import': 'Import backup',
   'settings.importFile': 'Backup file',
-  'settings.storageNotice.title': 'Keep a copy of your data',
-  'settings.storageNotice.body':
-    'Your device can clear app storage when it runs low on space, especially on iPhone. Turn on sync or export a backup regularly so you don’t lose anything.',
-  'settings.storageNotice.persisted':
-    'This browser agreed to keep Finanscho’s storage, but a backup is still a good idea.',
-  'settings.storageNotice.dismiss': 'Got it',
+  'settings.appStorage.title': 'App and storage',
+  'settings.appStorage.intro': 'How Finanscho runs on this device, and how safe your data is here.',
+  'settings.appStorage.app': 'App',
+  'settings.appStorage.installed': 'Installed',
+  'settings.appStorage.notInstalled': 'Running in the browser',
+  'settings.appStorage.storage': 'Storage',
+  'settings.appStorage.protected': 'Protected',
+  'settings.appStorage.notGuaranteed': 'Not guaranteed',
+  'settings.appStorage.protect': 'Protect my data',
+  'settings.appStorage.protectDenied':
+    'The browser didn’t agree to protect Finanscho’s storage. Installing the app usually helps.',
+  'settings.appStorage.used': 'Space used',
+  'settings.appStorage.usage': '{used} of {quota} available',
+  'settings.appStorage.advice':
+    'Your browser can clear Finanscho’s storage when space runs low. Turn on sync or export a backup regularly so you don’t lose anything.',
+  'settings.appStorage.persistedAdvice':
+    'The browser agreed to keep Finanscho’s data, but a backup is still a good idea.',
+
+  'install.banner.title': 'Install Finanscho on this device',
+  'install.banner.body':
+    'The installed app opens like any other app, works offline, and its data is much less likely to be cleared by the browser.',
+  'install.install': 'Install',
+  'install.howTo': 'How to install',
+  'install.notNow': 'Not now',
+  'install.dialog.title': 'Install Finanscho',
+  'install.steps.prompt.1': 'Choose Install, then confirm in the window your browser shows.',
+  'install.steps.iosSafari.1': 'Tap the Share button in Safari’s toolbar.',
+  'install.steps.iosSafari.2': 'Scroll down and tap Add to Home Screen.',
+  'install.steps.iosSafari.3': 'Tap Add. Finanscho appears on your home screen.',
+  'install.steps.iosOtherBrowser.1': 'Copy the address of this page.',
+  'install.steps.iosOtherBrowser.2':
+    'Open it in Safari. Safari can always add apps to the home screen.',
+  'install.steps.iosOtherBrowser.3': 'In Safari, tap Share, then Add to Home Screen.',
+  'install.steps.firefoxDesktop.1':
+    'Firefox on a computer can’t install web apps. You can keep using Finanscho here: choose Protect my data in Settings so Firefox keeps your data.',
+  'install.steps.firefoxDesktop.2':
+    'To install the app, open Finanscho in Chrome, Edge, or Safari.',
+  'install.steps.manual.1': 'Open your browser’s menu.',
+  'install.steps.manual.2': 'Choose Install app, Add to Home screen, or Install Finanscho.',
+  'install.carriesOver': 'Your data carries over to the installed app.',
+  'install.ios.warningTitle': 'Your data stays here in Safari',
+  'install.ios.warning':
+    'On iPhone and iPad, the home-screen app has its own storage, separate from Safari. Export a backup now and import it in the installed app, or turn on sync to bring your data across.',
+  'install.otherBrowser.warningTitle': 'Your data stays in this browser',
+  'install.otherBrowser.warning':
+    'Browsers don’t share data. Export a backup here first, then import it in the other browser, or turn on sync.',
+  'install.exportFirst': 'Export backup first',
+  'install.freshHint.title': 'Bring your data to this app',
+  'install.freshHint.body':
+    'This home-screen app starts empty, because it doesn’t share storage with Safari. In Settings, import the backup you exported or turn on sync.',
+  'install.freshHint.action': 'Open Settings',
 
   'notFound.title': 'Page not found',
   'notFound.body': 'This page doesn’t exist.',

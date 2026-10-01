@@ -22,6 +22,7 @@ import { detectPlatform } from '../infrastructure/platform/platform.js';
 import { onAppPause, onAppResume } from '../infrastructure/platform/lifecycle.js';
 import { onLocalMidnight } from '../infrastructure/platform/localMidnight.js';
 import { startServiceWorker } from '../infrastructure/platform/serviceWorker.js';
+import { BrowserInstallEnvironment } from '../infrastructure/platform/BrowserInstallEnvironment.js';
 import { SystemClock } from '../infrastructure/SystemClock.js';
 import { UuidGenerator } from '../infrastructure/UuidGenerator.js';
 import { ChangeFeed } from '../shared/ChangeFeed.js';
@@ -42,6 +43,7 @@ import { DashboardStore } from '../state/DashboardStore.js';
 import { SettingsStore } from '../state/SettingsStore.js';
 import { SyncStore } from '../state/SyncStore.js';
 import { ToastStore } from '../state/ToastStore.js';
+import { InstallStore } from '../state/InstallStore.js';
 import { createHashRouter } from '../ui/router/hashRouter.js';
 import { t } from '../ui/i18n/i18n.js';
 import { bindStoreInvalidation } from './storeInvalidation.js';
@@ -53,20 +55,6 @@ import { bindStoreInvalidation } from './storeInvalidation.js';
  */
 
 /**
- * Asks the browser to keep IndexedDB data under storage pressure, where supported.
- * @returns {Promise<boolean | null>} null when the API is unavailable
- */
-async function requestPersistentStorage() {
-  const storage = globalThis.navigator?.storage;
-  if (!storage || typeof storage.persist !== 'function') return null;
-  try {
-    return (await storage.persisted()) || (await storage.persist());
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Builds the whole application.
  * @param {{
  *   window: Window,
@@ -75,6 +63,8 @@ async function requestPersistentStorage() {
  * @returns {Promise<Container>}
  */
 export async function createContainer({ window, registerServiceWorker }) {
+  // First, so a `beforeinstallprompt` fired while the database opens is not missed.
+  const installEnvironment = new BrowserInstallEnvironment({ window });
   const platform = detectPlatform(window.navigator);
   const db = await openDatabase();
   const clock = new SystemClock();
@@ -114,7 +104,7 @@ export async function createContainer({ window, registerServiceWorker }) {
     backup: new IdbBackupRepository({ db, recorder }),
     clock,
   });
-  const settingsService = new SettingsService({ settings: repos.settings, device });
+  const settingsService = new SettingsService({ settings: repos.settings, device, clock });
 
   // Startup data work: replay ops deferred by an older version, seed defaults, catch up recurring.
   await recorder.replayDeferred();
@@ -152,16 +142,24 @@ export async function createContainer({ window, registerServiceWorker }) {
   });
 
   const accounts = new AccountsStore({ accountService });
+  const transactions = new TransactionsStore({ transactionService, accountsStore: accounts });
   const stores = {
     accounts,
     categories: new CategoriesStore({ categoryService }),
-    transactions: new TransactionsStore({ transactionService, accountsStore: accounts }),
+    transactions,
     budgets: new BudgetsStore({ budgetService, clock }),
     recurring: new RecurringStore({ recurringService }),
     dashboard: new DashboardStore({ dashboardService }),
     settings: new SettingsStore({ settingsService, backupService }),
     sync: new SyncStore({ syncControl: scheduler }),
     toasts: new ToastStore(),
+    install: new InstallStore({
+      environment: installEnvironment,
+      settingsService,
+      accountsStore: accounts,
+      transactionsStore: transactions,
+      clock,
+    }),
     router: createHashRouter(window),
     clock: { today: () => clock.today(), nowMs: () => clock.nowMs() },
   };
@@ -184,6 +182,7 @@ export async function createContainer({ window, registerServiceWorker }) {
     stores.dashboard.load(),
     stores.settings.load(),
     stores.sync.load(),
+    stores.install.load(),
   ]);
 
   const cancelMidnight = onLocalMidnight(() => {
@@ -191,9 +190,8 @@ export async function createContainer({ window, registerServiceWorker }) {
     void stores.budgets.invalidate();
     void stores.dashboard.invalidate();
   });
-  void requestPersistentStorage().then((persisted) =>
-    stores.settings.setStoragePersisted(persisted),
-  );
+  // Ask for persistent storage where that never shows a prompt; Firefox waits for a button (D38).
+  void stores.install.protectSilently();
   // Sync starts in the background so the UI never waits for the network.
   void scheduler.start();
 
@@ -218,6 +216,8 @@ export async function createContainer({ window, registerServiceWorker }) {
       cancelMidnight();
       unbind();
       stores.sync.dispose();
+      stores.install.dispose();
+      installEnvironment.dispose();
       stores.router.dispose();
       db.close();
     },

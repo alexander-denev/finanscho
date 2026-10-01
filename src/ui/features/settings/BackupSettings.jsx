@@ -3,26 +3,10 @@ import { useId } from 'preact/hooks';
 import { useStores } from '../../context/StoresProvider.jsx';
 import { Button } from '../../components/Button.jsx';
 import { InlineMessage } from '../../components/InlineMessage.jsx';
+import { useBackupExport } from '../../hooks/useBackupExport.js';
 import { errorMessage, t } from '../../i18n/i18n.js';
 import { SettingsSection } from './SettingsSection.jsx';
 import styles from './BackupSettings.module.css';
-
-/**
- * Offers a text file to the user as a download.
- * @param {string} fileName
- * @param {string} text
- * @returns {void}
- */
-function downloadText(fileName, text) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = fileName;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
-}
 
 /**
  * JSON export and import of the whole local database.
@@ -30,19 +14,15 @@ function downloadText(fileName, text) {
  */
 export function BackupSettings() {
   const { settings, toasts } = useStores();
+  const exporter = useBackupExport();
   const error = useSignal(/** @type {string | null} */ (null));
   const busy = useSignal(false);
   const fileInputId = useId();
+  const shownError = error.value ?? exporter.error.value;
 
   const exportBackup = async () => {
     error.value = null;
-    try {
-      const { fileName, json } = await settings.exportBackup();
-      downloadText(fileName, json);
-      toasts.show('toast.exported', { file: fileName });
-    } catch (failure) {
-      error.value = errorMessage(failure);
-    }
+    await exporter.exportBackup();
   };
 
   /** @param {Event} event */
@@ -69,7 +49,7 @@ export function BackupSettings() {
       title={t('settings.backup')}
       intro={t('settings.backupIntro')}
     >
-      {error.value && <InlineMessage tone="error">{error.value}</InlineMessage>}
+      {shownError && <InlineMessage tone="error">{shownError}</InlineMessage>}
       <div className={styles.actions}>
         <Button variant="primary" onClick={() => void exportBackup()}>
           {t('settings.export')}

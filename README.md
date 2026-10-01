@@ -107,6 +107,12 @@ metadata and deletions). Importing it into an empty install restores it exactly;
 install with data merges it using the normal sync rules. Browsers may clear app storage when space
 runs low, so enable sync or export backups regularly.
 
+**Install the app** for the best protection: installed apps are much less likely to have their
+storage cleared. Once you have data, Finanscho recommends installing it, and **Settings → App and
+storage** shows whether your data is protected ("Protect my data" asks the browser). On iPhone and
+iPad the home-screen app has its own storage, separate from Safari: export a backup first and
+import it in the installed app, or use sync.
+
 ## Project layout
 
 ```

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/preact';
 import { DashboardPage } from '../../../../src/ui/features/dashboard/DashboardPage.jsx';
 import { createUiStores, renderWithStores } from '../../../helpers/renderWithStores.jsx';
+import { FakeInstallEnvironment } from '../../../helpers/FakeInstallEnvironment.js';
 
 describe('DashboardPage', () => {
   it('tells a new user to add an account', async () => {
@@ -10,6 +11,17 @@ describe('DashboardPage', () => {
     expect(screen.getByRole('heading', { name: 'Start by adding an account' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Add an account' }).getAttribute('href')).toBe(
       '#/accounts',
+    );
+  });
+
+  it('points a fresh iOS home-screen app to import and sync', async () => {
+    const env = new FakeInstallEnvironment({ os: 'ios', browser: 'safari' });
+    env.standalone = true;
+    const ui = await createUiStores({ installEnvironment: env });
+    renderWithStores(<DashboardPage />, ui.stores);
+    expect(screen.getByText('Bring your data to this app')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Open Settings' }).getAttribute('href')).toBe(
+      '#/settings',
     );
   });
 

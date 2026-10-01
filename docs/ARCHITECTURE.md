@@ -30,18 +30,18 @@ per folder, plus `import-x/no-cycle`:
 
 ### What lives where
 
-| Folder                        | Contents                                                                                                                                                                                 |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/core/domain`             | Pure rules: money (minor units), local dates, entity factories/validators, recurrence schedule. No I/O, no clock.                                                                        |
-| `src/core/ports`              | JSDoc contracts: repositories, clock, id generator, change feed, credential store, sync transport/control.                                                                               |
-| `src/core/services`           | Use cases with constructor injection: accounts, categories, transactions, budgets, recurring, dashboard, backup, settings.                                                               |
-| `src/core/errors.js`          | Typed errors (`ValidationError`, `NotFoundError`, `BackupError`, `SyncError`) with stable codes for i18n.                                                                                |
-| `src/infrastructure/db`       | `database.js` (schema + migrations), `ChangeRecorder` (the only entity writer), IndexedDB repositories, credential store.                                                                |
-| `src/infrastructure/sync`     | `HybridLogicalClock`, `operation.js`, `deviceHead.js`, `merge.js` (pure LWW merge), `SyncEngine` (pull/push), `SyncScheduler` (triggers, backoff, status), `webdav/` (client, adapters). |
-| `src/infrastructure/platform` | `platform.js` (OS/browser detection for device names and install help), `lifecycle.js` (resume/pause), `localMidnight.js`.                                                               |
-| `src/state`                   | Stores on `@preact/signals-core`: private writable signals, public read-only getters, `computed()` views, async actions, `status`/`error`, `invalidate()`.                               |
-| `src/ui`                      | Preact components. `components/` generic, `features/<name>/` pages and feature parts, `hooks/`, `router/`, `i18n/`, `styles/`.                                                           |
-| `src/app`                     | `createContainer.js` wires everything; `App.jsx`, `AppShell.jsx`, `routes.js`, `storeInvalidation.js`.                                                                                   |
+| Folder                        | Contents                                                                                                                                                                                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/core/domain`             | Pure rules: money (minor units), local dates, entity factories/validators, recurrence schedule. No I/O, no clock.                                                                                                                                 |
+| `src/core/ports`              | JSDoc contracts: repositories, clock, id generator, change feed, credential store, sync transport/control.                                                                                                                                        |
+| `src/core/services`           | Use cases with constructor injection: accounts, categories, transactions, budgets, recurring, dashboard, backup, settings.                                                                                                                        |
+| `src/core/errors.js`          | Typed errors (`ValidationError`, `NotFoundError`, `BackupError`, `SyncError`) with stable codes for i18n.                                                                                                                                         |
+| `src/infrastructure/db`       | `database.js` (schema + migrations), `ChangeRecorder` (the only entity writer), IndexedDB repositories, credential store.                                                                                                                         |
+| `src/infrastructure/sync`     | `HybridLogicalClock`, `operation.js`, `deviceHead.js`, `merge.js` (pure LWW merge), `SyncEngine` (pull/push), `SyncScheduler` (triggers, backoff, status), `webdav/` (client, adapters).                                                          |
+| `src/infrastructure/platform` | `platform.js` (OS/browser detection for device names and install help), `lifecycle.js` (resume/pause), `localMidnight.js`, `serviceWorker.js` (guarded updates), `BrowserInstallEnvironment` (install prompt, display mode, `navigator.storage`). |
+| `src/state`                   | Stores on `@preact/signals-core`: private writable signals, public read-only getters, `computed()` views, async actions, `status`/`error`, `invalidate()`.                                                                                        |
+| `src/ui`                      | Preact components. `components/` generic, `features/<name>/` pages and feature parts, `hooks/`, `router/`, `i18n/`, `styles/`.                                                                                                                    |
+| `src/app`                     | `createContainer.js` wires everything; `App.jsx`, `AppShell.jsx`, `routes.js`, `storeInvalidation.js`.                                                                                                                                            |
 
 ## Data flow
 
@@ -89,17 +89,32 @@ Nothing aggregated is stored, so there is nothing to conflict during sync.
 
 ## Startup
 
-`main.jsx` loads `registerSW` (production builds only) → `createContainer({ window, registerServiceWorker })`:
+`main.jsx` loads `registerSW` (production builds only) → `createContainer({ window, registerServiceWorker })`,
+which first builds `BrowserInstallEnvironment` so an early `beforeinstallprompt` is not missed:
 
 1. open IndexedDB (running migrations), get or create the device id, set a default device name;
 2. build repositories and services;
 3. replay deferred remote ops, seed default categories once, materialize recurring transactions;
 4. build the sync scheduler (`fetch` on every platform) and the stores;
 5. bind store invalidation, load all stores;
-6. start the local-midnight timer, request persistent storage, start sync in the background;
+6. start the local-midnight timer, ask for persistent storage where that never prompts
+   (`InstallStore.protectSilently`, D38), start sync in the background;
 7. register the service worker (`infrastructure/platform/serviceWorker.js`).
 
 If IndexedDB cannot be opened (for example in some private windows), a plain explanation is shown.
+
+### Installing and storage protection
+
+IndexedDB is the only store, and browsers may evict it. Installed PWAs are far less likely to lose
+data (Chromium grants `persist()` heuristically, Safari exempts home-screen apps from its 7-day
+eviction), so the app recommends installing (D38):
+
+- `core/ports/installEnvironment.js` describes the install prompt, display mode, platform, and
+  `navigator.storage`; `BrowserInstallEnvironment` implements it; `InstallStore` observes it.
+- `InstallBanner` (top of `<main>`) appears once the user has real data, unless installed or
+  snoozed. `AppStorageSettings` (first in Settings) shows install status, storage protection,
+  and space used. `InstallInstructionsDialog` (`ui/components`) gives per-browser steps, warns that
+  an iOS home-screen app does not share Safari's storage, and offers "Export backup first".
 
 ### Offline and updates
 
