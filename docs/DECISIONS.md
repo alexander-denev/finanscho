@@ -274,3 +274,40 @@ that works fully offline.
 
 **Behaviour change:** iOS sync used to bypass CORS through CapacitorHttp. Every platform now needs a
 CORS-enabled WebDAV server (or the dev proxy). Supersedes D19, D21, and D30.
+
+### D36. Silent, guarded service worker updates
+
+`registerType: 'prompt'`, but nobody is prompted: `serviceWorker.js` applies a waiting update with
+`updateSW(true)` as soon as it is safe. Safe means no `<dialog>` is open (every form lives in a
+dialog) and no sync cycle is running, or the page is hidden. Otherwise it re-checks on the next
+dialog `close` (listened for in the capture phase, because `close` does not bubble), sync status
+change, or `visibilitychange`. `autoUpdate` was rejected because it reloads immediately and could
+discard a half-filled form; a visible prompt was rejected as needless friction.
+
+- The module reloads the page itself on `controllerchange`. vite-plugin-pwa reloads only when the
+  page was already controlled when it registered, which is false on the first visit (the worker
+  claims the page later through `clientsClaim`). Found with a headless-Edge check: the new worker
+  activated but the old bundle kept running.
+- It is injected into the composition root (`main.jsx` loads `virtual:pwa-register`, which only
+  exists in Vite builds) so it can read the sync status and show the "works offline" toast.
+- Registration errors go to `globalThis.reportError`, which logs without throwing (and needs no
+  `no-console` exception). A failed update is reported and retried at the next safe moment.
+- Hourly `registration.update()` while visible and online.
+- Manual offline checks must use a normal reload: a forced reload (Shift+Reload, or
+  `Page.reload({ ignoreCache: true })`) bypasses service workers by design.
+
+### D37. `verifyPwaBuild` in the gate
+
+`scripts/verifyPwaBuild.js` runs after `vite build` in `npm run check`. It asserts the manifest's
+required fields, `any` icons at 192 and 512 px, a maskable icon, narrow and wide screenshots (PNG
+sizes match the declared `sizes`), the manifest and touch-icon links in `index.html`, and that every
+emitted file except `sw.js` and the workbox runtime is in the precache, so a future asset cannot
+silently break offline use.
+
+The install-sheet screenshots are the one deliberate exception: they are excluded from the
+precache (`globIgnores`) because only the browser's install UI reads them, and the verifier allows
+exactly the files the manifest lists (and checks they are not precached). They are real captures of
+a production build with demo data (390×844 at 2× and 1440×900), taken with headless Edge. The
+maskable icon is a separate file with the artwork scaled to 80% so it stays inside the safe zone.
+Plan numbering note: decisions are numbered in the order they ship, so the plan's D41 is D37 and
+its D37–D40 are D38–D41.

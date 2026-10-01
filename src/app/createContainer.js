@@ -21,6 +21,7 @@ import { FetchHttpAdapter } from '../infrastructure/sync/webdav/FetchHttpAdapter
 import { detectPlatform } from '../infrastructure/platform/platform.js';
 import { onAppPause, onAppResume } from '../infrastructure/platform/lifecycle.js';
 import { onLocalMidnight } from '../infrastructure/platform/localMidnight.js';
+import { startServiceWorker } from '../infrastructure/platform/serviceWorker.js';
 import { SystemClock } from '../infrastructure/SystemClock.js';
 import { UuidGenerator } from '../infrastructure/UuidGenerator.js';
 import { ChangeFeed } from '../shared/ChangeFeed.js';
@@ -67,10 +68,13 @@ async function requestPersistentStorage() {
 
 /**
  * Builds the whole application.
- * @param {{ window: Window }} env
+ * @param {{
+ *   window: Window,
+ *   registerServiceWorker?: import('../infrastructure/platform/serviceWorker.js').RegisterSw,
+ * }} env `registerServiceWorker` is `registerSW` from `virtual:pwa-register` (production builds only)
  * @returns {Promise<Container>}
  */
-export async function createContainer({ window }) {
+export async function createContainer({ window, registerServiceWorker }) {
   const platform = detectPlatform(window.navigator);
   const db = await openDatabase();
   const clock = new SystemClock();
@@ -193,9 +197,23 @@ export async function createContainer({ window }) {
   // Sync starts in the background so the UI never waits for the network.
   void scheduler.start();
 
+  // Updates apply silently, but never while a form is open or a sync cycle runs (D36).
+  const stopServiceWorker = registerServiceWorker
+    ? startServiceWorker({
+        register: registerServiceWorker,
+        document: window.document,
+        isBusy: () =>
+          window.document.querySelector('dialog[open]') !== null ||
+          scheduler.getStatus().state === 'syncing',
+        onBusyChange: (listener) => scheduler.subscribe(() => listener()),
+        onOfflineReady: () => stores.toasts.show('toast.offlineReady'),
+      })
+    : () => {};
+
   return {
     stores,
     dispose() {
+      stopServiceWorker();
       scheduler.stop();
       cancelMidnight();
       unbind();

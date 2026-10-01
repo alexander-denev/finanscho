@@ -89,17 +89,30 @@ Nothing aggregated is stored, so there is nothing to conflict during sync.
 
 ## Startup
 
-`main.jsx` → `createContainer()`:
+`main.jsx` loads `registerSW` (production builds only) → `createContainer({ window, registerServiceWorker })`:
 
 1. open IndexedDB (running migrations), get or create the device id, set a default device name;
 2. build repositories and services;
 3. replay deferred remote ops, seed default categories once, materialize recurring transactions;
 4. build the sync scheduler (`fetch` on every platform) and the stores;
 5. bind store invalidation, load all stores;
-6. start the local-midnight timer, request persistent storage, start sync in the background.
+6. start the local-midnight timer, request persistent storage, start sync in the background;
+7. register the service worker (`infrastructure/platform/serviceWorker.js`).
 
 If IndexedDB cannot be opened (for example in some private windows), a plain explanation is shown.
-A service worker (vite-plugin-pwa) precaches the app shell for offline use.
+
+### Offline and updates
+
+A service worker (vite-plugin-pwa, `generateSW`) precaches every emitted file, so the app loads
+and saves data with no network at all. Navigations fall back to `index.html`; WebDAV traffic is
+cross-origin and never cached. `scripts/verifyPwaBuild.js` (part of `npm run check`) fails the
+gate if a file escapes the precache or the manifest is incomplete (D37).
+
+Updates are applied silently by `serviceWorker.js` (D36): when a new version is waiting, it
+activates it and reloads only if no `<dialog>` is open and no sync cycle is running, or the page is
+hidden. Otherwise it waits for a dialog `close`, a sync status change, or `visibilitychange`.
+It checks for a new version hourly while visible and shows one "works offline" toast after the
+first install.
 
 ## Sync
 

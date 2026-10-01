@@ -9,7 +9,7 @@ before changing persistence or sync. Log every deviation or non-obvious decision
 ## Verification
 
 ```sh
-npm run check        # format:check → lint → typecheck → test → build; must pass with 0 errors, 0 warnings
+npm run check        # format:check → lint → typecheck → test → build → verify:pwa; 0 errors, 0 warnings
 npm run test         # vitest (node project: core/infrastructure/state/shared; dom project: tests/ui)
 npm run lint:fix && npm run format
 ```

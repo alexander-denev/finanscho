@@ -2,8 +2,10 @@
  * Generates the app icons (PNG + SVG) from simple geometry, without extra dependencies.
  * Run with `node scripts/generateIcons.js`. Output goes to `public/`.
  *
- * Design: a paper ledger page with ruled lines and a brass coin on a pine background. All shapes
- * sit inside the central 80% so the icon is safe as a maskable icon.
+ * Design: a paper ledger page with ruled lines and a brass coin on a pine background. The regular
+ * icons use the full artwork. `maskable-512x512.png` shrinks the artwork to 80% so every shape sits
+ * well inside the maskable safe zone (a centred circle with a 40% radius), whatever mask the
+ * launcher applies.
  */
 
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -39,7 +41,10 @@ function colorAt(x, y) {
   return color;
 }
 
-function render(size) {
+/** Artwork scale for the maskable icon (1 = full artwork). */
+const MASKABLE_SCALE = 0.8;
+
+function render(size, scale) {
   const samples = 4;
   const rows = [];
   for (let py = 0; py < size; py += 1) {
@@ -48,7 +53,9 @@ function render(size) {
       const sum = [0, 0, 0];
       for (let sy = 0; sy < samples; sy += 1) {
         for (let sx = 0; sx < samples; sx += 1) {
-          const c = colorAt((px + (sx + 0.5) / samples) / size, (py + (sy + 0.5) / samples) / size);
+          const u = (px + (sx + 0.5) / samples) / size;
+          const v = (py + (sy + 0.5) / samples) / size;
+          const c = colorAt(0.5 + (u - 0.5) / scale, 0.5 + (v - 0.5) / scale);
           for (let i = 0; i < 3; i += 1) sum[i] += c[i];
         }
       }
@@ -80,7 +87,7 @@ function chunk(type, data) {
   return Buffer.concat([length, body, crc]);
 }
 
-function png(size) {
+function png(size, scale = 1) {
   const header = Buffer.alloc(13);
   header.writeUInt32BE(size, 0);
   header.writeUInt32BE(size, 4);
@@ -89,7 +96,7 @@ function png(size) {
   return Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     chunk('IHDR', header),
-    chunk('IDAT', deflateSync(render(size), { level: 9 })),
+    chunk('IDAT', deflateSync(render(size, scale), { level: 9 })),
     chunk('IEND', Buffer.alloc(0)),
   ]);
 }
@@ -109,10 +116,11 @@ function svg() {
 
 mkdirSync('public', { recursive: true });
 writeFileSync('public/favicon.svg', svg());
-for (const [name, size] of [
-  ['pwa-192x192.png', 192],
-  ['pwa-512x512.png', 512],
-  ['apple-touch-icon.png', 180],
+for (const [name, size, scale] of [
+  ['pwa-192x192.png', 192, 1],
+  ['pwa-512x512.png', 512, 1],
+  ['maskable-512x512.png', 512, MASKABLE_SCALE],
+  ['apple-touch-icon.png', 180, 1],
 ]) {
-  writeFileSync(`public/${name}`, png(size));
+  writeFileSync(`public/${name}`, png(size, scale));
 }

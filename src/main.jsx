@@ -7,9 +7,22 @@ import { t } from './ui/i18n/i18n.js';
 
 const root = document.getElementById('app');
 
+/**
+ * `registerSW` in production builds that can run a service worker; undefined otherwise.
+ * @returns {Promise<import('./infrastructure/platform/serviceWorker.js').RegisterSw | undefined>}
+ */
+function loadServiceWorkerRegistration() {
+  if (!('serviceWorker' in navigator) || !import.meta.env.PROD) return Promise.resolve(undefined);
+  return import('virtual:pwa-register').then(
+    ({ registerSW }) => registerSW,
+    () => undefined,
+  );
+}
+
 if (root) {
   root.textContent = t('app.loading');
-  createContainer({ window })
+  loadServiceWorkerRegistration()
+    .then((registerServiceWorker) => createContainer({ window, registerServiceWorker }))
     .then((container) => {
       root.textContent = '';
       render(<App stores={container.stores} />, root);
@@ -24,9 +37,4 @@ if (root) {
         root,
       );
     });
-
-  // Offline support: the service worker precaches the app shell.
-  if ('serviceWorker' in navigator && import.meta.env.PROD) {
-    void import('virtual:pwa-register').then(({ registerSW }) => registerSW({ immediate: true }));
-  }
 }

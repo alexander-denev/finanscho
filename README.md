@@ -30,16 +30,17 @@ npm run dev        # http://localhost:5173
 
 ## Scripts
 
-| Script              | What it does                                                     |
-| ------------------- | ---------------------------------------------------------------- |
-| `npm run dev`       | Vite dev server                                                  |
-| `npm run build`     | Production build to `dist/` (with service worker and manifest)   |
-| `npm run preview`   | Serve the production build                                       |
-| `npm run lint`      | ESLint (includes the layer dependency rules)                     |
-| `npm run format`    | Prettier (write); `format:check` only checks                     |
-| `npm run typecheck` | `tsc --noEmit` over JS with JSDoc types                          |
-| `npm test`          | Vitest (Node project + DOM project); `test:watch` for watch mode |
-| `npm run check`     | format check → lint → typecheck → test → build                   |
+| Script               | What it does                                                     |
+| -------------------- | ---------------------------------------------------------------- |
+| `npm run dev`        | Vite dev server                                                  |
+| `npm run build`      | Production build to `dist/` (with service worker and manifest)   |
+| `npm run preview`    | Serve the production build                                       |
+| `npm run lint`       | ESLint (includes the layer dependency rules)                     |
+| `npm run format`     | Prettier (write); `format:check` only checks                     |
+| `npm run typecheck`  | `tsc --noEmit` over JS with JSDoc types                          |
+| `npm test`           | Vitest (Node project + DOM project); `test:watch` for watch mode |
+| `npm run check`      | format check → lint → typecheck → test → build → verify:pwa      |
+| `npm run verify:pwa` | Check the build's manifest, icons, and service worker precache   |
 
 `npm run check` must pass with zero errors and zero warnings before any change is merged.
 
@@ -53,6 +54,24 @@ npm run preview    # or deploy dist/ to any static host
 The app uses hash routing (`#/transactions`), so no server rewrites are needed. Install it from
 the browser's "Install app" menu (desktop and Android) or **Share → Add to Home Screen** (iPhone and
 iPad); it works offline after the first visit.
+
+### Hosting
+
+Deploy `dist/` to any static host. For the offline app and updates to work reliably:
+
+- **Serve over HTTPS.** Service workers, installation, and persistent storage need a secure
+  context (`http://localhost` is fine for testing).
+- **Serve `sw.js` and `index.html` with `Cache-Control: no-cache`** so browsers always revalidate
+  them and pick up new versions. Files under `assets/` have content hashes in their names and can
+  be cached for a long time (`Cache-Control: public, max-age=31536000, immutable`).
+- Serve `manifest.webmanifest` as `application/manifest+json`.
+- Updates install in the background and apply silently on the next safe moment: never while a
+  form is open or a sync is running.
+- The WebDAV server is a different origin and must allow CORS (see
+  [Server requirements](#server-requirements)). The service worker never caches WebDAV traffic.
+
+`public/screenshots/` holds the install-sheet screenshots (real captures of the app with demo data).
+They are listed in the manifest but not precached, because the app itself never loads them.
 
 ## Sync with WebDAV
 

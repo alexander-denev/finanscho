@@ -160,6 +160,7 @@ export const EN = Object.freeze({
   'toast.syncDisconnected': 'Sync turned off. Your data stays on this device.',
   'toast.exported': 'Backup saved as {file}.',
   'toast.imported': 'Backup imported. {count} records updated.',
+  'toast.offlineReady': 'Finanscho now works offline.',
 
   'dashboard.title': 'Dashboard',
   'dashboard.netWorth': 'Total balance',
