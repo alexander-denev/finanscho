@@ -113,7 +113,6 @@ for (const [name, size] of [
   ['pwa-192x192.png', 192],
   ['pwa-512x512.png', 512],
   ['apple-touch-icon.png', 180],
-  ['icon-1024.png', 1024],
 ]) {
   writeFileSync(`public/${name}`, png(size));
 }

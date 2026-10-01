@@ -2,7 +2,6 @@
 // The web lifecycle path listens to document visibility changes.
 import { describe, expect, it, vi } from 'vitest';
 import { onAppPause, onAppResume } from '../../../src/infrastructure/platform/lifecycle.js';
-import { getPlatformName, isNative } from '../../../src/infrastructure/platform/platform.js';
 
 /** @param {'visible' | 'hidden'} state */
 function setVisibility(state) {
@@ -10,12 +9,7 @@ function setVisibility(state) {
   document.dispatchEvent(new Event('visibilitychange'));
 }
 
-describe('lifecycle (web)', () => {
-  it('reports the web platform', () => {
-    expect(isNative()).toBe(false);
-    expect(getPlatformName()).toBe('web');
-  });
-
+describe('lifecycle', () => {
   it('maps visibility changes to resume and pause', () => {
     const resume = vi.fn();
     const pause = vi.fn();

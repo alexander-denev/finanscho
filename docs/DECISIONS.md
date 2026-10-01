@@ -120,6 +120,8 @@ the create arrives.
 
 ### D19. Native HTTP: PROPFIND/MKCOL work on iOS, not on Android
 
+> **Superseded by D35** (2026-10-02): the native shells were removed; every platform uses `fetch`.
+
 Verified by reading the installed Capacitor 8.5 sources (there is no Android SDK or Xcode on the
 build machine, so no on-device test was possible):
 
@@ -152,6 +154,8 @@ The three-device convergence simulations are long, so they sit next to `SyncEngi
 file named after the same source file plus a qualifier, keeping both files under ~300 lines.
 
 ### D21. Credentials in IndexedDB (v1)
+
+> **Superseded by D35** (2026-10-02): a PWA has no Keychain/Keystore, so IndexedDB is the store.
 
 WebDAV credentials are stored through the `credentialStore` port by `IdbCredentialStore`, in the
 `meta` store. On Android and iOS this should be replaced with a Keychain/Keystore-backed
@@ -211,6 +215,9 @@ the choice. Default currency and device name are saved with the "Save settings" 
 
 ### D30. Backup export uses a browser download
 
+> **Superseded by D35** (2026-10-02): there is no WKWebView build any more; Safari and installed
+> PWAs handle the download.
+
 Export creates a Blob and triggers an `<a download>` click. This works in browsers and Android
 WebViews; iOS WKWebView ignores `download` for blob URLs. Proposed follow-up for native: add
 `@capacitor/filesystem` + `@capacitor/share` (new runtime dependencies) to save/share the file.
@@ -237,11 +244,33 @@ error with a reason, last sync time). `ToastStore` never loads anything, so its 
 `package.json` declares `"engines": { "node": ">=22.12" }`, the lowest version supported by Vitest 5
 and `eslint-plugin-jsdoc`.
 
-### D34. Overrides for deprecated transitive dependencies
+### D34. Override for a deprecated transitive dependency
 
-The latest `workbox-build` (via `vite-plugin-pwa`) depends on the deprecated `glob@^11`, and the
-latest `xcode` (via `@capacitor/cli`) on the deprecated `uuid@^7`. `package.json` `overrides`
-scope **`glob@^13`** to `workbox-build` and **`uuid@^11`** to `xcode`. Both keep the APIs those
-packages call (`globSync`, the CommonJS `uuid.v4`); uuid 11 is the version its own deprecation
-notice recommends for CommonJS. The remaining `eslint@9` deprecation warning is expected (D1).
-Remove the overrides when upstream updates the ranges.
+The latest `workbox-build` (via `vite-plugin-pwa`) depends on the deprecated `glob@^11`.
+`package.json` `overrides` scope **`glob@^13`** to `workbox-build`, which keeps the `globSync`
+API it calls. The remaining `eslint@9` deprecation warning is expected (D1). Remove the override
+when upstream updates the range. (An earlier `uuid` override for Capacitor's `xcode` dependency
+went away with Capacitor, D35.)
+
+## 2026-10-02
+
+### D35. PWA only
+
+The Capacitor shells for Android and iOS were barely used: no native plugins, never built, and
+Android already fell back to `fetch` (D19). They added a second release path, a deprecated
+dependency override (D34), and platform branches. Finanscho now ships as **one installable PWA**
+that works fully offline.
+
+- Removed `capacitor.config.json`, `android/`, `ios/`, `NativeHttpAdapter`, the `cap:sync`
+  script, the `unsupportedMethod` sync reason, and `icon-1024.png`.
+- `@capacitor/*` is banned in every file by `no-restricted-imports`. Because a later flat-config
+  entry for the same rule replaces an earlier one, each layer rule repeats the ban.
+- `platform.js` now exposes `detectPlatform(navigator)` → `{ os, browser }` (UA Client Hints, then
+  the user-agent string; iPadOS in desktop mode is recognised by touch points). It is used only for
+  the default device name and install instructions, never to switch features. Its tests live in
+  `platform.test.js` (mirroring the source file) rather than `lifecycle.test.js`.
+- `lifecycle.js` keeps only the `visibilitychange` path.
+- Default device names are keyed `ios`/`android`/`desktop` (the old `web` key is gone).
+
+**Behaviour change:** iOS sync used to bypass CORS through CapacitorHttp. Every platform now needs a
+CORS-enabled WebDAV server (or the dev proxy). Supersedes D19, D21, and D30.

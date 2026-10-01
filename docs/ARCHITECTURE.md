@@ -1,8 +1,8 @@
 # Architecture
 
 Finanscho is a local-first personal finance app. All data lives in IndexedDB on the device; an
-optional WebDAV server lets several devices exchange changes. One codebase runs as a PWA on the
-desktop and inside Capacitor shells on Android and iOS.
+optional WebDAV server lets several devices exchange changes. It ships as one installable,
+fully offline PWA for desktop, Android, and iOS (no native shells; DECISIONS D35).
 
 ## Layers
 
@@ -18,13 +18,15 @@ shared/ leaf utilities (debounce, assert, ChangeFeed) — imports no other layer
 Dependencies point inward only. `eslint.config.js` enforces this with `no-restricted-imports`
 per folder, plus `import-x/no-cycle`:
 
-| Files under             | May not import                                                                            |
-| ----------------------- | ----------------------------------------------------------------------------------------- |
-| `src/core/**`           | infrastructure, state, ui, app, `preact`, `@preact/signals(-core)`, `idb`, `@capacitor/*` |
-| `src/infrastructure/**` | state, ui, app, `preact`, `@preact/signals`                                               |
-| `src/state/**`          | infrastructure, ui, app, `preact`, `@preact/signals`, `idb`, `@capacitor/*`               |
-| `src/ui/**`             | infrastructure, core/services, app, `idb`, `@preact/signals-core`, `@capacitor/*`         |
-| `src/shared/**`         | every other layer and framework package                                                   |
+| Files under             | May not import                                                            |
+| ----------------------- | ------------------------------------------------------------------------- |
+| `src/core/**`           | infrastructure, state, ui, app, `preact`, `@preact/signals(-core)`, `idb` |
+| `src/infrastructure/**` | state, ui, app, `preact`, `@preact/signals`                               |
+| `src/state/**`          | infrastructure, ui, app, `preact`, `@preact/signals`, `idb`               |
+| `src/ui/**`             | infrastructure, core/services, app, `idb`, `@preact/signals-core`         |
+| `src/shared/**`         | every other layer and framework package                                   |
+
+`@capacitor/*` is banned in every file (D35).
 
 ### What lives where
 
@@ -36,7 +38,7 @@ per folder, plus `import-x/no-cycle`:
 | `src/core/errors.js`          | Typed errors (`ValidationError`, `NotFoundError`, `BackupError`, `SyncError`) with stable codes for i18n.                                                                                |
 | `src/infrastructure/db`       | `database.js` (schema + migrations), `ChangeRecorder` (the only entity writer), IndexedDB repositories, credential store.                                                                |
 | `src/infrastructure/sync`     | `HybridLogicalClock`, `operation.js`, `deviceHead.js`, `merge.js` (pure LWW merge), `SyncEngine` (pull/push), `SyncScheduler` (triggers, backoff, status), `webdav/` (client, adapters). |
-| `src/infrastructure/platform` | `platform.js` (native vs web), `lifecycle.js` (resume/pause), `localMidnight.js`.                                                                                                        |
+| `src/infrastructure/platform` | `platform.js` (OS/browser detection for device names and install help), `lifecycle.js` (resume/pause), `localMidnight.js`.                                                               |
 | `src/state`                   | Stores on `@preact/signals-core`: private writable signals, public read-only getters, `computed()` views, async actions, `status`/`error`, `invalidate()`.                               |
 | `src/ui`                      | Preact components. `components/` generic, `features/<name>/` pages and feature parts, `hooks/`, `router/`, `i18n/`, `styles/`.                                                           |
 | `src/app`                     | `createContainer.js` wires everything; `App.jsx`, `AppShell.jsx`, `routes.js`, `storeInvalidation.js`.                                                                                   |
@@ -92,13 +94,12 @@ Nothing aggregated is stored, so there is nothing to conflict during sync.
 1. open IndexedDB (running migrations), get or create the device id, set a default device name;
 2. build repositories and services;
 3. replay deferred remote ops, seed default categories once, materialize recurring transactions;
-4. build the sync scheduler (iOS: native HTTP; Android and web: `fetch`) and the stores;
+4. build the sync scheduler (`fetch` on every platform) and the stores;
 5. bind store invalidation, load all stores;
 6. start the local-midnight timer, request persistent storage, start sync in the background.
 
 If IndexedDB cannot be opened (for example in some private windows), a plain explanation is shown.
-On the web a service worker (vite-plugin-pwa) caches the app shell for offline use; native builds
-skip it.
+A service worker (vite-plugin-pwa) precaches the app shell for offline use.
 
 ## Sync
 
@@ -108,7 +109,7 @@ deterministic IDs, crash safety, and transport details.
 ## UI
 
 - Hash router (`#/transactions`) built on a signal, created by the composition root, so it works
-  from `file://`-like Capacitor origins and any static host.
+  on any static host without server rewrites.
 - `AppShell`: bottom tab bar and floating "Add transaction" button below 1024 px; left sidebar
   from 1024 px (CSS only). Hosts the sync indicator and toasts; moves focus to `<main>` after
   navigation.

@@ -16,14 +16,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build",
-    "cap:sync": "npm run build && npx cap sync",
     "init-install": "npm install"
   },
   "dependencies": {
-    "@capacitor/android": "^8.5.2",
-    "@capacitor/app": "^8.1.1",
-    "@capacitor/core": "^8.5.2",
-    "@capacitor/ios": "^8.5.2",
     "@preact/signals": "^2.11.2",
     "@preact/signals-core": "^1.14.4",
     "idb": "^8.0.3",
@@ -31,7 +26,6 @@
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
-    "@capacitor/cli": "^8.5.2",
     "@eslint/js": "^9.39.5",
     "@preact/preset-vite": "^2.10.6",
     "@testing-library/preact": "^3.2.4",
@@ -58,9 +52,6 @@
   "overrides": {
     "workbox-build": {
       "glob": "^13.0.6"
-    },
-    "xcode": {
-      "uuid": "^11.1.1"
     }
   },
   "allowScripts": {

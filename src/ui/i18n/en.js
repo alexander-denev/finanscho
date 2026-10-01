@@ -134,7 +134,7 @@ export const EN = Object.freeze({
   'errors.sync.offline':
     'You’re offline. Changes are saved on this device and will sync when you’re back online.',
   'errors.sync.network':
-    'Couldn’t reach the server. Check the address. In a browser or on Android, the server must allow CORS for this app.',
+    'Couldn’t reach the server. Check the address. The server must allow CORS for this app.',
   'errors.sync.auth': 'The server rejected the username or password. Check them in Settings.',
   'errors.sync.notFound': 'The server address or folder wasn’t found. Check the server URL.',
   'errors.sync.server': 'The server had a problem. Finanscho will try again shortly.',
@@ -142,7 +142,6 @@ export const EN = Object.freeze({
     'This sync folder was created by a newer version of Finanscho. Update the app to keep syncing.',
   'errors.sync.malformed':
     'The sync folder contains a damaged file. Other devices may need attention.',
-  'errors.sync.unsupportedMethod': 'This device can’t send the WebDAV requests sync needs.',
   'errors.sync.unknown': 'Sync failed unexpectedly. Try again.',
 
   'toast.transactionSaved': 'Transaction saved.',
@@ -310,13 +309,13 @@ export const EN = Object.freeze({
   'settings.deviceNameHint': 'Shown to your other devices in the sync folder.',
   'settings.saveGeneral': 'Save settings',
   'settings.defaultDeviceName.android': 'Android phone',
-  'settings.defaultDeviceName.ios': 'iPhone',
-  'settings.defaultDeviceName.web': 'Web browser',
+  'settings.defaultDeviceName.ios': 'iPhone or iPad',
+  'settings.defaultDeviceName.desktop': 'Computer',
   'settings.sync': 'Sync',
   'settings.syncIntro':
     'Keep your data in step across devices through your own WebDAV server (for example Nextcloud). Your data is also always kept on this device.',
   'settings.syncCors':
-    'In a desktop browser and on Android, the server must allow cross-origin requests (CORS) from this app. On iPhone this isn’t needed.',
+    'On every device, including iPhone, the server must allow cross-origin requests (CORS) from this app.',
   'settings.serverUrl': 'Server URL',
   'settings.serverUrlHint':
     'The WebDAV address, like https://cloud.example.com/remote.php/dav/files/you',

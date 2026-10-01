@@ -238,20 +238,12 @@ WebDAV over HTTP with Basic auth, implemented in `WebDavClient` on top of an `ht
 - `checkAccess()` — `PROPFIND` with `Depth: 0` on the server URL; used by "Test connection",
   which never writes.
 
-Adapters:
-
-- **Browser** (`FetchHttpAdapter`, `fetch`): the WebDAV server must send CORS headers for the app's
-  origin, allowing methods `GET, PUT, PROPFIND, MKCOL, OPTIONS`, request headers
-  `Authorization, Content-Type, Depth`, and answering preflight `OPTIONS` requests without
-  authentication. For local development, set `WEBDAV_PROXY_TARGET` in `.env.local` and use
-  `http://localhost:5173/webdav-proxy/…` as the server URL (Vite dev-server proxy).
-- **iOS** (`NativeHttpAdapter`, `CapacitorHttp`): requests go through `URLSession`, which sends
-  any method token, so CORS does not apply.
-- **Android**: `CapacitorHttp` on Android uses `HttpURLConnection`, which rejects `PROPFIND` and
-  `MKCOL`. `NativeHttpAdapter` therefore refuses those methods with `unsupportedMethod` instead of
-  degrading silently, and v1 uses `FetchHttpAdapter` (the WebView's `fetch`) on Android. The
-  server must allow CORS for the origin `https://localhost`. See `docs/DECISIONS.md` (D19) for the
-  proposed native fix.
+There is one adapter, `FetchHttpAdapter` (`fetch`), on every platform (DECISIONS D35). The WebDAV
+server must therefore send CORS headers for the app's origin on every platform, including iOS:
+allowed methods `GET, PUT, PROPFIND, MKCOL, OPTIONS`, request headers
+`Authorization, Content-Type, Depth, Cache-Control`, and preflight `OPTIONS` requests answered
+without authentication. For local development, set `WEBDAV_PROXY_TARGET` in `.env.local` and use
+`http://localhost:5173/webdav-proxy/…` as the server URL (Vite dev-server proxy).
 
 ### Changing vaults
 
@@ -265,8 +257,7 @@ Readers tolerate gaps between segments for this reason.
 
 ## 9. Scheduling
 
-When WebDAV is configured, a cycle runs on app start; on resume (`appStateChange` on native,
-`visibilitychange` on the web); 5 s after the last local write (debounced); every 5 minutes while
+When WebDAV is configured, a cycle runs on app start; on resume (`visibilitychange`); 5 s after the last local write (debounced); every 5 minutes while
 in the foreground; and on "Sync now". Transient failures (offline, network, 5xx) back off
 exponentially (5 s, 10 s, 20 s … capped at 5 minutes). Auth, format, and configuration errors
 get no backoff retries; the regular triggers (resume, the 5-minute interval, "Sync now", and

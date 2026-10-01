@@ -1,7 +1,7 @@
 # CLAUDE.md — rules for agent sessions in this repo
 
 Local-first personal finance app: Preact + Signals + IndexedDB (`idb`), optional WebDAV sync,
-Capacitor for Android/iOS, Vite PWA for desktop. Plain JavaScript (ES2022, ESM) with JSDoc types
+shipped only as an installable, fully offline Vite PWA (no native shells, D35). Plain JavaScript (ES2022, ESM) with JSDoc types
 checked by `tsc` (`checkJs`, `strict`). Read `docs/ARCHITECTURE.md` and `docs/SYNC_PROTOCOL.md`
 before changing persistence or sync. Log every deviation or non-obvious decision in
 `docs/DECISIONS.md`.
@@ -12,7 +12,6 @@ before changing persistence or sync. Log every deviation or non-obvious decision
 npm run check        # format:check → lint → typecheck → test → build; must pass with 0 errors, 0 warnings
 npm run test         # vitest (node project: core/infrastructure/state/shared; dom project: tests/ui)
 npm run lint:fix && npm run format
-npm run cap:sync     # build + copy web assets into android/ and ios/
 ```
 
 Tooling pins (see DECISIONS D1–D3): ESLint 9 (plugin compatibility), TypeScript 6.0, Vitest 5.
@@ -32,14 +31,15 @@ app/ = composition root (createContainer.js wires everything; only place with mo
 shared/ = leaf utilities (debounce, assert, ChangeFeed); imports no other layer
 ```
 
-| Files under             | May not import                                                                            |
-| ----------------------- | ----------------------------------------------------------------------------------------- |
-| `src/core/**`           | infrastructure, state, ui, app, `preact`, `@preact/signals(-core)`, `idb`, `@capacitor/*` |
-| `src/infrastructure/**` | state, ui, app, `preact`, `@preact/signals`                                               |
-| `src/state/**`          | infrastructure, ui, app, `preact`, `@preact/signals`, `idb`, `@capacitor/*`               |
-| `src/ui/**`             | infrastructure, core/services, app, `idb`, `@preact/signals-core`, `@capacitor/*`         |
+| Files under             | May not import                                                            |
+| ----------------------- | ------------------------------------------------------------------------- |
+| `src/core/**`           | infrastructure, state, ui, app, `preact`, `@preact/signals(-core)`, `idb` |
+| `src/infrastructure/**` | state, ui, app, `preact`, `@preact/signals`                               |
+| `src/state/**`          | infrastructure, ui, app, `preact`, `@preact/signals`, `idb`               |
+| `src/ui/**`             | infrastructure, core/services, app, `idb`, `@preact/signals-core`         |
 
-Enforced by `no-restricted-imports` in `eslint.config.js`; `import-x/no-cycle` is on. No barrel
+Enforced by `no-restricted-imports` in `eslint.config.js`; `import-x/no-cycle` is on. `@capacitor/*`
+is banned everywhere. No barrel
 files — import each module from its own file, with the extension.
 
 - `core/domain`: pure rules, factories, validators. No I/O, no system clock, no DOM.
@@ -120,5 +120,6 @@ UPPER_SNAKE_CASE only for true constants, `onX` for callback props.
 - Never write to a vault whose `format` is newer than supported. Validate every downloaded file.
 - Seeds use `SEED_HLC` (minimum clock); occurrences use the rule's `_clocks.createdAt`; backup
   import and vault switches replay records through `ChangeRecorder` with their original clocks.
-- Transport: iOS uses `NativeHttpAdapter` (CapacitorHttp); Android and web use `FetchHttpAdapter`
-  (server needs CORS) because Android's native HTTP rejects PROPFIND/MKCOL (DECISIONS D19).
+- Transport: one adapter, `FetchHttpAdapter`, on every platform; the server needs CORS
+  (DECISIONS D35). Platform detection (`detectPlatform`) only picks the default device name and
+  install instructions, never features.

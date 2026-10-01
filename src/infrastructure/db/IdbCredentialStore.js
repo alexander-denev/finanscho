@@ -6,8 +6,8 @@ import { STORES } from './database.js';
 const KEY = 'webdavCredentials';
 
 /**
- * v1 credential store: keeps WebDAV credentials in IndexedDB (`meta`). On native platforms this
- * should be replaced by a Keychain/Keystore-backed implementation (see docs/DECISIONS.md).
+ * Credential store: keeps WebDAV credentials in IndexedDB (`meta`), the only durable storage a
+ * PWA has (see docs/DECISIONS.md, D35).
  */
 export class IdbCredentialStore {
   #db;

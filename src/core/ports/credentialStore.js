@@ -8,8 +8,8 @@
  */
 
 /**
- * Credential store port. v1 stores credentials in IndexedDB; a Keychain/Keystore-backed
- * implementation should replace it on native (see docs/DECISIONS.md).
+ * Credential store port. Credentials are kept in IndexedDB, the only durable storage a PWA has
+ * (see docs/DECISIONS.md, D35).
  * @typedef {object} CredentialStore
  * @property {() => Promise<WebDavCredentials | null>} load
  * @property {(credentials: WebDavCredentials) => Promise<void>} save

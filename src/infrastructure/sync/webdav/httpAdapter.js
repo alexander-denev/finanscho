@@ -1,9 +1,8 @@
 /**
- * HTTP adapter port used by WebDavClient. Implementations: FetchHttpAdapter (browser) and
- * NativeHttpAdapter (Capacitor native HTTP).
+ * HTTP adapter port used by WebDavClient. Implementation: FetchHttpAdapter (browser `fetch`).
  *
  * `request` resolves with any HTTP status (including 4xx/5xx) and rejects only when no response
- * was received, with a `SyncError` whose reason is `offline`, `network`, or `unsupportedMethod`.
+ * was received, with a `SyncError` whose reason is `offline` or `network`.
  */
 
 /**

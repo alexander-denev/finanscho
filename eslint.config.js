@@ -21,6 +21,18 @@ import prettier from 'eslint-config-prettier';
 const relativeInto = (folders) => `^\\.{1,2}/(?:.*/)?(?:${folders.join('|')})(?:/|$)`;
 
 /**
+ * Packages banned everywhere. Finanscho is a PWA only (docs/DECISIONS.md, D35), so native-shell
+ * packages must not creep back in.
+ */
+const GLOBALLY_BANNED = [
+  {
+    regex: '^@capacitor/',
+    message:
+      'Finanscho is a PWA only; Capacitor packages are not allowed (docs/DECISIONS.md, D35).',
+  },
+];
+
+/**
  * @param {string} layer human-readable layer name for the message
  * @param {string[]} folders forbidden src folders
  * @param {string[]} packages forbidden package regexes
@@ -39,6 +51,8 @@ function layerRule(layer, folders, packages) {
           regex: pkg,
           message: `${layer} may not depend on this package (see docs/ARCHITECTURE.md).`,
         })),
+        // A later config's rule entry replaces an earlier one, so every layer repeats the ban.
+        ...GLOBALLY_BANNED,
       ],
     },
   ];
@@ -48,11 +62,10 @@ const PREACT = '^preact(?:/|$)';
 const SIGNALS_PREACT = '^@preact/signals$';
 const SIGNALS_CORE = '^@preact/signals-core$';
 const IDB = '^idb$';
-const CAPACITOR = '^@capacitor/';
 
 export default [
   {
-    ignores: ['dist/**', 'dev-dist/**', 'android/**', 'ios/**', 'coverage/**', 'node_modules/**'],
+    ignores: ['dist/**', 'dev-dist/**', 'coverage/**', 'node_modules/**'],
   },
   {
     linterOptions: { reportUnusedDisableDirectives: 'error' },
@@ -81,6 +94,7 @@ export default [
       eqeqeq: ['error', 'always'],
       'prefer-const': 'error',
       'no-var': 'error',
+      'no-restricted-imports': ['error', { patterns: GLOBALLY_BANNED }],
     },
   },
   // Config files and scripts run in Node.
@@ -152,7 +166,7 @@ export default [
       'no-restricted-imports': layerRule(
         'core',
         ['infrastructure', 'state', 'ui', 'app'],
-        [PREACT, SIGNALS_PREACT, SIGNALS_CORE, IDB, CAPACITOR],
+        [PREACT, SIGNALS_PREACT, SIGNALS_CORE, IDB],
       ),
     },
   },
@@ -172,7 +186,7 @@ export default [
       'no-restricted-imports': layerRule(
         'state',
         ['infrastructure', 'ui', 'app'],
-        [PREACT, SIGNALS_PREACT, IDB, CAPACITOR],
+        [PREACT, SIGNALS_PREACT, IDB],
       ),
     },
   },
@@ -182,7 +196,7 @@ export default [
       'no-restricted-imports': layerRule(
         'ui',
         ['infrastructure', 'core/services', 'app'],
-        [IDB, SIGNALS_CORE, CAPACITOR],
+        [IDB, SIGNALS_CORE],
       ),
     },
   },
@@ -192,7 +206,7 @@ export default [
       'no-restricted-imports': layerRule(
         'shared',
         ['core', 'infrastructure', 'state', 'ui', 'app'],
-        [PREACT, SIGNALS_PREACT, SIGNALS_CORE, IDB, CAPACITOR],
+        [PREACT, SIGNALS_PREACT, SIGNALS_CORE, IDB],
       ),
     },
   },

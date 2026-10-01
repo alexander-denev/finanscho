@@ -18,8 +18,7 @@ import { SyncEngine } from '../infrastructure/sync/SyncEngine.js';
 import { SyncScheduler } from '../infrastructure/sync/SyncScheduler.js';
 import { WebDavClient } from '../infrastructure/sync/webdav/WebDavClient.js';
 import { FetchHttpAdapter } from '../infrastructure/sync/webdav/FetchHttpAdapter.js';
-import { NativeHttpAdapter } from '../infrastructure/sync/webdav/NativeHttpAdapter.js';
-import { getPlatformName } from '../infrastructure/platform/platform.js';
+import { detectPlatform } from '../infrastructure/platform/platform.js';
 import { onAppPause, onAppResume } from '../infrastructure/platform/lifecycle.js';
 import { onLocalMidnight } from '../infrastructure/platform/localMidnight.js';
 import { SystemClock } from '../infrastructure/SystemClock.js';
@@ -72,7 +71,7 @@ async function requestPersistentStorage() {
  * @returns {Promise<Container>}
  */
 export async function createContainer({ window }) {
-  const platform = getPlatformName();
+  const platform = detectPlatform(window.navigator);
   const db = await openDatabase();
   const clock = new SystemClock();
   const ids = new UuidGenerator();
@@ -82,7 +81,7 @@ export async function createContainer({ window }) {
   const device = new IdbDeviceRepository({ db, newId });
   const deviceId = await device.getDeviceId();
   if ((await device.getDeviceName()) === '') {
-    await device.setDeviceName(t(`settings.defaultDeviceName.${platform}`));
+    await device.setDeviceName(t(`settings.defaultDeviceName.${platform.os}`));
   }
   const recorder = new ChangeRecorder({ db, deviceId, nowMs: () => clock.nowMs(), changeFeed });
 
@@ -118,8 +117,8 @@ export async function createContainer({ window }) {
   await categoryService.seedDefaults();
   await recurringService.materialize();
 
-  // Sync. iOS uses native HTTP; Android and the web use fetch (see docs/DECISIONS.md, D19).
-  const http = platform === 'ios' ? new NativeHttpAdapter({ platform }) : new FetchHttpAdapter();
+  // Sync over fetch; the WebDAV server must allow CORS (see docs/SYNC_PROTOCOL.md §8).
+  const http = new FetchHttpAdapter();
   /**
    * @param {import('../core/ports/credentialStore.js').WebDavCredentials} credentials
    * @returns {WebDavClient}
