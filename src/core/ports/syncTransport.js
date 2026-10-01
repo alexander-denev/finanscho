@@ -23,6 +23,7 @@
  * @property {(path: string) => Promise<string | null>} get file text, or null when absent
  * @property {(path: string, body: string) => Promise<void>} put
  * @property {(path: string) => Promise<RemoteEntry[]>} list direct children of a folder
+ * @property {(path: string) => Promise<void>} delete remove a file, or a folder and everything in it when `path` ends with `/`; succeeds when already absent
  */
 
 /**
@@ -32,6 +33,7 @@
  * @property {string | null} lastSyncedAt ISO time of the last successful cycle
  * @property {number} deferredOps remote changes from the last cycle that need a newer app version
  * @property {number} issues malformed remote files skipped in the last cycle
+ * @property {boolean} cleanupBlocked the server refused to delete superseded files (usually CORS without DELETE); sync itself works
  */
 
 /**

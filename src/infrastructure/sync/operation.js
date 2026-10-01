@@ -104,6 +104,19 @@ export function segmentFileName(startSeq, endSeq) {
 }
 
 /**
+ * Seq range of a segment file name, or null when the name is not a segment file.
+ * @param {string} name e.g. '000000000001-000000000500.json'
+ * @returns {{ startSeq: number, endSeq: number } | null}
+ */
+export function parseSegmentFileName(name) {
+  const match = /^(\d{12})-(\d{12})\.json$/.exec(name);
+  if (!match) return null;
+  const startSeq = Number(match[1]);
+  const endSeq = Number(match[2]);
+  return startSeq >= 1 && endSeq >= startSeq ? { startSeq, endSeq } : null;
+}
+
+/**
  * Validates a downloaded segment: an array of valid ops from one device with contiguous seqs
  * matching the declared range.
  * @param {unknown} value parsed JSON

@@ -7,7 +7,7 @@
  */
 
 import { HybridLogicalClock } from '../sync/HybridLogicalClock.js';
-import { applyOp, recordToOps } from '../sync/merge.js';
+import { applyOp, isPrunableTombstone, recordToOps, tombstoneStub } from '../sync/merge.js';
 import { isSupportedOp, OP_VERSION } from '../sync/operation.js';
 import { STORES } from './database.js';
 
@@ -17,6 +17,7 @@ import { STORES } from './database.js';
 /** @typedef {import('../sync/operation.js').EntityName} EntityName */
 /** @typedef {import('../sync/operation.js').OpOrigin} OpOrigin */
 /** @typedef {import('../../core/ports/changeFeed.js').ChangeFeed} ChangeFeed */
+/** @typedef {import('../sync/deviceHead.js').Checkpoint} Checkpoint */
 /** @typedef {import('idb').IDBPTransaction<unknown, string[], 'readwrite'>} WriteTx */
 
 export const META_KEYS = /** @type {const} */ ({
@@ -25,7 +26,23 @@ export const META_KEYS = /** @type {const} */ ({
   hlc: 'hlc',
   localSeq: 'localSeq',
   deferredOps: 'deferredOps',
+  /** A queued checkpoint not yet published (`Checkpoint`); see SyncEngine. */
+  pendingCheckpoint: 'pendingCheckpoint',
+  /** True while superseded segment files may still be on the server. */
+  gcPending: 'gcPending',
 });
+
+/** Tombstones deleted longer ago than this are pruned to stubs locally (docs/DECISIONS.md, D40). */
+export const TOMBSTONE_PRUNE_AGE_MS = 30 * 86_400_000;
+
+/** Entity stores, in the order their state is re-queued. */
+const ENTITIES = /** @type {EntityName[]} */ ([
+  STORES.accounts,
+  STORES.categories,
+  STORES.transactions,
+  STORES.budgets,
+  STORES.recurringRules,
+]);
 
 /**
  * @typedef {object} WriteRequest
@@ -164,39 +181,24 @@ export class ChangeRecorder {
   }
 
   /**
-   * Prepares for syncing with a different vault: re-queues every record's current state as ops
-   * (one per distinct field clock, keeping the original clocks) and clears all remote cursors, so
-   * the new vault receives the full data set and is pulled from scratch. Records are unchanged.
-   * @returns {Promise<number>} ops queued
+   * Builds ops (one per distinct field clock, original clocks kept) for every record's current
+   * state, with seqs following `lastSeq`. Shared by republishing and checkpoints.
+   * @param {WriteTx} tx a transaction over every entity store
+   * @param {number} lastSeq
+   * @param {{ stubs: boolean }} options `stubs`: reduce tombstones to stubs
+   * @returns {Promise<Op[]>}
    */
-  async republishAll() {
-    const entities = /** @type {EntityName[]} */ ([
-      STORES.accounts,
-      STORES.categories,
-      STORES.transactions,
-      STORES.budgets,
-      STORES.recurringRules,
-    ]);
-    const tx = /** @type {WriteTx} */ (
-      this.#db.transaction(
-        [...entities, STORES.outbox, STORES.meta, STORES.syncCursors],
-        'readwrite',
-      )
-    );
-    const done = observeDone(tx);
-    const meta = tx.objectStore(STORES.meta);
-    const outbox = tx.objectStore(STORES.outbox);
-    const storedSeq = await meta.get(META_KEYS.localSeq);
-    let seq = typeof storedSeq === 'number' ? storedSeq : 0;
-    let queued = 0;
-    for (const entity of entities) {
+  async #stateOps(tx, lastSeq, { stubs }) {
+    /** @type {Op[]} */
+    const ops = [];
+    let seq = lastSeq;
+    for (const entity of ENTITIES) {
       const records = /** @type {StoredRecord[]} */ (await tx.objectStore(entity).getAll());
-      for (const record of records) {
+      for (const stored of records) {
+        const record = stubs ? tombstoneStub(stored) : stored;
         for (const { hlc, fields } of recordToOps(record)) {
           seq += 1;
-          queued += 1;
-          /** @type {Op} */
-          const op = {
+          ops.push({
             v: OP_VERSION,
             deviceId: this.#deviceId,
             seq,
@@ -205,26 +207,149 @@ export class ChangeRecorder {
             id: record.id,
             fields,
             origin: 'user',
-          };
-          await outbox.put(op);
+          });
         }
       }
     }
+    return ops;
+  }
+
+  /**
+   * Prepares for syncing with a different vault: re-queues every record's current state as ops
+   * (one per distinct field clock, keeping the original clocks) and clears all remote cursors, so
+   * the new vault receives the full data set and is pulled from scratch. Records are unchanged.
+   * A pending checkpoint and pending cleanup are dropped; their ops are published as plain ops.
+   * @returns {Promise<number>} ops queued
+   */
+  async republishAll() {
+    const tx = /** @type {WriteTx} */ (
+      this.#db.transaction(
+        [...ENTITIES, STORES.outbox, STORES.meta, STORES.syncCursors],
+        'readwrite',
+      )
+    );
+    const done = observeDone(tx);
+    const meta = tx.objectStore(STORES.meta);
+    const outbox = tx.objectStore(STORES.outbox);
+    const storedSeq = await meta.get(META_KEYS.localSeq);
+    const ops = await this.#stateOps(tx, typeof storedSeq === 'number' ? storedSeq : 0, {
+      stubs: false,
+    });
+    for (const op of ops) await outbox.put(op);
     await tx.objectStore(STORES.syncCursors).clear();
-    await meta.put(seq, META_KEYS.localSeq);
+    await meta.delete(META_KEYS.pendingCheckpoint);
+    await meta.delete(META_KEYS.gcPending);
+    if (ops.length > 0) await meta.put(ops[ops.length - 1].seq, META_KEYS.localSeq);
     await done;
-    return queued;
+    return ops.length;
+  }
+
+  /**
+   * Queues a checkpoint (docs/SYNC_PROTOCOL.md §10): this device's full current state as fresh ops
+   * with original clocks, tombstones reduced to stubs, plus the frontier — the remote cursors whose
+   * ops that state already contains. Devices with deferred ops are left out of the frontier, since
+   * those ops are not in the state. Cursors are kept. Runs in one transaction, so local writes land
+   * entirely before or after it.
+   *
+   * Returns null without queueing anything when the outbox is not empty (every earlier op must be
+   * published first), a checkpoint is already pending, there is no state, or the checkpoint would
+   * exceed `maxOps` (it would not shrink the log).
+   * @param {{ createdAt: string, maxOps?: number }} options
+   * @returns {Promise<Checkpoint | null>}
+   */
+  async queueCheckpoint({ createdAt, maxOps = Number.POSITIVE_INFINITY }) {
+    const tx = /** @type {WriteTx} */ (
+      this.#db.transaction(
+        [...ENTITIES, STORES.outbox, STORES.meta, STORES.syncCursors],
+        'readwrite',
+      )
+    );
+    const done = observeDone(tx);
+    const meta = tx.objectStore(STORES.meta);
+    const outbox = tx.objectStore(STORES.outbox);
+    const [queued, storedSeq, pending, deferredStored, cursorRows] = await Promise.all([
+      outbox.count(),
+      meta.get(META_KEYS.localSeq),
+      meta.get(META_KEYS.pendingCheckpoint),
+      meta.get(META_KEYS.deferredOps),
+      /** @type {Promise<{ deviceId: string, lastSeq: number }[]>} */ (
+        tx.objectStore(STORES.syncCursors).getAll()
+      ),
+    ]);
+    if (queued > 0 || pending) {
+      await done;
+      return null;
+    }
+    const ops = await this.#stateOps(tx, typeof storedSeq === 'number' ? storedSeq : 0, {
+      stubs: true,
+    });
+    if (ops.length === 0 || ops.length > maxOps) {
+      await done;
+      return null;
+    }
+    const deferredFrom = new Set(
+      (Array.isArray(deferredStored) ? /** @type {Op[]} */ (deferredStored) : []).map(
+        (op) => op.deviceId,
+      ),
+    );
+    /** @type {Record<string, number>} */
+    const frontier = {};
+    for (const { deviceId, lastSeq } of cursorRows) {
+      if (lastSeq > 0 && !deferredFrom.has(deviceId)) frontier[deviceId] = lastSeq;
+    }
+    /** @type {Checkpoint} */
+    const checkpoint = {
+      startSeq: ops[0].seq,
+      endSeq: ops[ops.length - 1].seq,
+      frontier,
+      createdAt,
+    };
+    for (const op of ops) await outbox.put(op);
+    await meta.put(checkpoint, META_KEYS.pendingCheckpoint);
+    await meta.put(checkpoint.endSeq, META_KEYS.localSeq);
+    await done;
+    return checkpoint;
+  }
+
+  /**
+   * Rewrites tombstones deleted more than `olderThanMs` ago as stubs (`tombstoneStub`). Local
+   * only: no ops, no change-feed event (nothing visible changes). Stubs are never purged: recurring
+   * materialization relies on the ID existing, and `_clocks.deleted` must keep beating late ops.
+   * @param {number} nowMs
+   * @param {number} [olderThanMs]
+   * @returns {Promise<number>} records pruned
+   */
+  async pruneTombstones(nowMs, olderThanMs = TOMBSTONE_PRUNE_AGE_MS) {
+    const tx = /** @type {WriteTx} */ (this.#db.transaction(ENTITIES, 'readwrite'));
+    const done = observeDone(tx);
+    let pruned = 0;
+    for (const entity of ENTITIES) {
+      const store = tx.objectStore(entity);
+      const records = /** @type {StoredRecord[]} */ (await store.getAll());
+      for (const record of records) {
+        if (!isPrunableTombstone(record, nowMs, olderThanMs)) continue;
+        await store.put(tombstoneStub(record));
+        pruned += 1;
+      }
+    }
+    await done;
+    return pruned;
   }
 
   /**
    * Merges a batch of remote ops from one device and advances that device's cursor, atomically.
    * Ops this client does not understand (newer `v`, unknown entity) are kept in `meta` for replay
    * after an app update instead of being dropped.
+   *
+   * `frontier` is passed with the last segment of a checkpoint: the checkpoint contains every op
+   * of those devices up to those seqs, so their cursors are raised to at least that far, in the
+   * same transaction (docs/SYNC_PROTOCOL.md §10.4).
    * @param {Op[]} ops ops from one device, ascending seq
    * @param {{ deviceId: string, lastSeq: number }} cursor new cursor position
+   * @param {Record<string, number>} [frontier]
    * @returns {Promise<{ changed: EntityName[], deferred: number }>}
    */
-  async applyRemote(ops, cursor) {
+  async applyRemote(ops, cursor, frontier) {
     const stores = [
       STORES.accounts,
       STORES.categories,
@@ -269,6 +394,11 @@ export class ChangeRecorder {
     if (deferred.length !== deferredBefore) await meta.put(deferred, META_KEYS.deferredOps);
     if (cursor.lastSeq > appliedSeq) {
       await cursors.put({ deviceId: cursor.deviceId, lastSeq: cursor.lastSeq });
+    }
+    for (const [deviceId, lastSeq] of Object.entries(frontier ?? {})) {
+      if (deviceId === this.#deviceId || deviceId === cursor.deviceId) continue;
+      const row = /** @type {{ lastSeq: number } | undefined} */ (await cursors.get(deviceId));
+      if ((row?.lastSeq ?? 0) < lastSeq) await cursors.put({ deviceId, lastSeq });
     }
     await done;
     return { changed: [...changed], deferred: deferred.length - deferredBefore };

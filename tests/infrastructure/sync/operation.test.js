@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isSupportedOp,
   parseSegment,
+  parseSegmentFileName,
   segmentFileName,
   validateOp,
 } from '../../../src/infrastructure/sync/operation.js';
@@ -25,8 +26,12 @@ const op = (seq, over = {}) => ({
 });
 
 describe('operation', () => {
-  it('names segments with zero-padded seqs', () => {
+  it('names segments with zero-padded seqs and parses the names back', () => {
     expect(segmentFileName(1, 500)).toBe('000000000001-000000000500.json');
+    expect(parseSegmentFileName(segmentFileName(501, 742))).toEqual({ startSeq: 501, endSeq: 742 });
+    expect(parseSegmentFileName('head.json')).toBeNull();
+    expect(parseSegmentFileName('000000000009-000000000002.json')).toBeNull();
+    expect(parseSegmentFileName('000000000000-000000000002.json')).toBeNull();
   });
 
   it('validates op shape', () => {

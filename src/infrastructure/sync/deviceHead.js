@@ -8,12 +8,23 @@ import { segmentFileName } from './operation.js';
 /** @typedef {{ file: string, startSeq: number, endSeq: number }} SegmentRef */
 
 /**
+ * A checkpoint: seqs `startSeq..endSeq` hold the device's full state at `createdAt`, which
+ * contains every op of each `frontier` device up to that seq (docs/SYNC_PROTOCOL.md §10).
+ * @typedef {object} Checkpoint
+ * @property {number} startSeq
+ * @property {number} endSeq
+ * @property {Record<string, number>} frontier
+ * @property {string} createdAt
+ */
+
+/**
  * @typedef {object} DeviceHead
  * @property {string} deviceId
  * @property {string} deviceName
  * @property {number} lastSeq
  * @property {SegmentRef[]} segments
  * @property {string} [updatedAt]
+ * @property {Checkpoint} [checkpoint] optional; absent in heads written before compaction
  */
 
 /**
@@ -28,6 +39,46 @@ export function parseJson(text) {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * @param {unknown} value
+ * @returns {value is number}
+ */
+function isSeq(value) {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+/**
+ * Validates a head's optional checkpoint: its range must be exactly a contiguous run of listed
+ * segments, and the frontier must map device IDs to seqs. Returns undefined when absent or invalid,
+ * so a bad checkpoint is ignored rather than making the head unreadable.
+ * @param {unknown} value
+ * @param {SegmentRef[]} segments
+ * @returns {Checkpoint | undefined}
+ */
+export function parseCheckpoint(value, segments) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+  const { startSeq, endSeq, frontier, createdAt } = /** @type {Record<string, unknown>} */ (value);
+  if (!isSeq(startSeq) || !isSeq(endSeq) || startSeq < 1 || endSeq < startSeq) return undefined;
+  if (typeof createdAt !== 'string') return undefined;
+  if (typeof frontier !== 'object' || frontier === null || Array.isArray(frontier)) {
+    return undefined;
+  }
+  const entries = Object.entries(frontier);
+  if (!entries.every(([id, seq]) => id !== '' && isSeq(seq))) return undefined;
+  const first = segments.findIndex((s) => s.startSeq === startSeq);
+  if (first === -1) return undefined;
+  let expected = startSeq;
+  for (const segment of segments.slice(first)) {
+    if (segment.startSeq !== expected) return undefined;
+    if (segment.endSeq === endSeq) {
+      return { startSeq, endSeq, frontier: Object.fromEntries(entries), createdAt };
+    }
+    if (segment.endSeq > endSeq) return undefined;
+    expected = segment.endSeq + 1;
+  }
+  return undefined;
 }
 
 /**
@@ -60,11 +111,16 @@ export function parseHead(value, deviceId) {
   }
   const lastEnd = head.segments.length > 0 ? expectedStart - 1 : 0;
   if (lastEnd !== head.lastSeq) return null;
-  return {
+  const segments = /** @type {SegmentRef[]} */ (head.segments);
+  /** @type {DeviceHead} */
+  const parsed = {
     deviceId,
     deviceName: typeof head.deviceName === 'string' ? head.deviceName : '',
     lastSeq: head.lastSeq,
-    segments: /** @type {SegmentRef[]} */ (head.segments),
+    segments,
     updatedAt: typeof head.updatedAt === 'string' ? head.updatedAt : undefined,
   };
+  const checkpoint = parseCheckpoint(head.checkpoint, segments);
+  if (checkpoint) parsed.checkpoint = checkpoint;
+  return parsed;
 }

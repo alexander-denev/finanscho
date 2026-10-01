@@ -32,6 +32,31 @@ describe('WebDavClient', () => {
     expect(server.collections.has('remote/dav/apps/finanscho/devices/d1/ops')).toBe(true);
   });
 
+  it('deletes files and whole collections, treating missing ones as deleted', async () => {
+    const server = new InMemoryWebDav();
+    const client = clientFor(server);
+    await client.ensureCollection('devices/old/ops');
+    await client.put('devices/old/head.json', '{}');
+    await client.put('devices/old/ops/a.json', '[]');
+    await client.put('devices/keep.json', '{}');
+    await client.delete('devices/keep.json');
+    expect(await client.get('devices/keep.json')).toBeNull();
+    await client.delete('devices/keep.json');
+    await client.delete('devices/old/');
+    expect(server.log.at(-1)?.method).toBe('DELETE');
+    expect(await client.list('devices')).toEqual([]);
+    expect([...server.files.keys()].some((p) => p.includes('devices/old'))).toBe(false);
+  });
+
+  it('reports a refused DELETE as an error', async () => {
+    const server = new InMemoryWebDav();
+    const client = clientFor(server);
+    server.failNext({ method: 'DELETE', pathIncludes: 'x.json', status: 405 });
+    await expect(client.delete('x.json')).rejects.toMatchObject({ reason: 'server', status: 405 });
+    server.failNext({ method: 'DELETE', pathIncludes: 'x.json', status: 403 });
+    await expect(client.delete('x.json')).rejects.toMatchObject({ reason: 'auth' });
+  });
+
   it('puts, gets, and reports missing files as null', async () => {
     const server = new InMemoryWebDav();
     const client = clientFor(server);

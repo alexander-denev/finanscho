@@ -106,8 +106,10 @@ export async function createContainer({ window, registerServiceWorker }) {
   });
   const settingsService = new SettingsService({ settings: repos.settings, device, clock });
 
-  // Startup data work: replay ops deferred by an older version, seed defaults, catch up recurring.
+  // Startup data work: replay ops deferred by an older version, seed defaults, catch up recurring,
+  // and shrink old tombstones to stubs (local only, D40).
   await recorder.replayDeferred();
+  await recorder.pruneTombstones(clock.nowMs());
   await categoryService.seedDefaults();
   await recurringService.materialize();
 

@@ -3,9 +3,11 @@ import {
   applyOp,
   applyOps,
   canonicalJson,
+  isPrunableTombstone,
   isVisible,
   mergeRecords,
   recordToOps,
+  tombstoneStub,
 } from '../../../src/infrastructure/sync/merge.js';
 import { HybridLogicalClock } from '../../../src/infrastructure/sync/HybridLogicalClock.js';
 import { createRandom } from '../../helpers/random.js';
@@ -147,6 +149,55 @@ describe('merge', () => {
     expect(isVisible({ id: 'x', _clocks: {} })).toBe(false);
     expect(isVisible({ id: 'x', _clocks: {}, createdAt: 't' })).toBe(true);
     expect(isVisible({ id: 'x', _clocks: {}, createdAt: 't', deleted: true })).toBe(false);
+  });
+
+  it('reduces tombstones to stubs, keeping fields written after the delete', () => {
+    const at = (/** @type {number} */ wallMs) =>
+      HybridLogicalClock.format({ wallMs, counter: 0, deviceId: 'd' });
+    const record = {
+      id: 't',
+      amountMinor: 100,
+      note: 'late edit',
+      date: '2024-05-01',
+      deleted: true,
+      updatedAt: 'u',
+      _clocks: {
+        amountMinor: at(1),
+        date: at(1),
+        note: at(9),
+        deleted: at(5),
+        updatedAt: at(9),
+      },
+    };
+    expect(tombstoneStub(record)).toEqual({
+      id: 't',
+      note: 'late edit',
+      deleted: true,
+      updatedAt: 'u',
+      _clocks: { note: at(9), deleted: at(5), updatedAt: at(9) },
+    });
+    const live = { ...record, deleted: false };
+    expect(tombstoneStub(live)).toBe(live);
+
+    const day = 86_400_000;
+    expect(isPrunableTombstone(record, 31 * day, 30 * day)).toBe(true);
+    expect(isPrunableTombstone(record, 29 * day, 30 * day)).toBe(false);
+    expect(isPrunableTombstone(tombstoneStub(record), 31 * day, 30 * day)).toBe(false);
+    expect(isPrunableTombstone(live, 31 * day, 30 * day)).toBe(false);
+  });
+
+  it('stub merging is still a join: stubs and full tombstones converge (property)', () => {
+    for (let seed = 1; seed <= 20; seed += 1) {
+      const ops = randomOps(seed, 30);
+      const full = applyOps(undefined, ops);
+      if (!full) continue;
+      // Any replica that stubbed the record and then received every op again agrees with the
+      // stub of the full replica.
+      const replayed = applyOps(tombstoneStub(full), ops);
+      expect(canonicalJson(tombstoneStub(/** @type {any} */ (replayed)))).toBe(
+        canonicalJson(tombstoneStub(full)),
+      );
+    }
   });
 
   it('serializes canonically with sorted keys', () => {

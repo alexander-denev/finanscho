@@ -5,6 +5,8 @@
  * field is commutative, associative, and idempotent, so any delivery order converges.
  */
 
+import { HybridLogicalClock } from './HybridLogicalClock.js';
+
 /**
  * A stored entity record: plain fields plus per-field clocks.
  * @typedef {{ id: string, _clocks: Record<string, string>, [field: string]: unknown }} StoredRecord
@@ -131,4 +133,46 @@ export function recordToOps(record) {
  */
 export function isVisible(record) {
   return record !== undefined && record.deleted !== true && typeof record.createdAt === 'string';
+}
+
+/** Fields a tombstone stub always keeps (besides `id`). */
+const STUB_FIELDS = ['deleted', 'updatedAt'];
+
+/**
+ * Reduces a tombstone to a stub (docs/DECISIONS.md, D40): `id`, `deleted`, `updatedAt`, and every
+ * field written after the delete, each with its clock. Fields older than the delete can go: nothing
+ * un-deletes a record without rewriting every field (budgets), and such a rewrite must beat the
+ * delete clock, so it beats them too. A later edit must stay, because a rewrite older than that
+ * edit may still win the `deleted` field. Non-tombstones are returned unchanged.
+ * @param {StoredRecord} record
+ * @returns {StoredRecord}
+ */
+export function tombstoneStub(record) {
+  if (record.deleted !== true) return record;
+  const deletedClock = record._clocks.deleted;
+  /** @type {StoredRecord} */
+  const stub = { id: record.id, _clocks: {} };
+  for (const [field, clock] of Object.entries(record._clocks)) {
+    if (!(field in record)) continue;
+    const keep = STUB_FIELDS.includes(field) || deletedClock === undefined || clock > deletedClock;
+    if (!keep) continue;
+    stub[field] = record[field];
+    stub._clocks[field] = clock;
+  }
+  return stub;
+}
+
+/**
+ * Whether a tombstone was deleted more than `olderThanMs` ago and still carries fields a stub
+ * would drop. Local pruning rewrites such records as stubs.
+ * @param {StoredRecord} record
+ * @param {number} nowMs
+ * @param {number} olderThanMs
+ * @returns {boolean}
+ */
+export function isPrunableTombstone(record, nowMs, olderThanMs) {
+  if (record.deleted !== true) return false;
+  const deletedAt = HybridLogicalClock.parse(record._clocks.deleted);
+  if (!deletedAt || deletedAt.wallMs > nowMs - olderThanMs) return false;
+  return Object.keys(tombstoneStub(record)._clocks).length < Object.keys(record._clocks).length;
 }

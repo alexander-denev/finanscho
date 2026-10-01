@@ -69,7 +69,7 @@ function statusError(response, method, url) {
 }
 
 /**
- * Minimal WebDAV client (MKCOL, GET, PUT, PROPFIND) with HTTP Basic auth. Implements the
+ * Minimal WebDAV client (MKCOL, GET, PUT, PROPFIND, DELETE) with HTTP Basic auth. Implements the
  * `SyncTransport` port; paths are relative to `<url>/<vaultPath>/`.
  */
 export class WebDavClient {
@@ -157,6 +157,19 @@ export class WebDavClient {
     );
     if (response.status >= 200 && response.status < 300) return;
     throw statusError(response, 'PUT', url);
+  }
+
+  /**
+   * Deletes a file, or a collection with everything in it (RFC 4918 §9.6) when `path` ends with
+   * `/`. A missing resource counts as deleted.
+   * @param {string} path
+   * @returns {Promise<void>}
+   */
+  async delete(path) {
+    const url = this.urlFor(path, path.endsWith('/'));
+    const response = await this.#send('DELETE', url);
+    if (response.status === 404 || (response.status >= 200 && response.status < 300)) return;
+    throw statusError(response, 'DELETE', url);
   }
 
   /**

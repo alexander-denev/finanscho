@@ -20,7 +20,14 @@ import { FakeInstallEnvironment } from './FakeInstallEnvironment.js';
  */
 export function createFakeSyncControl() {
   /** @type {SyncStatus} */
-  let status = { state: 'disabled', reason: null, lastSyncedAt: null, deferredOps: 0, issues: 0 };
+  let status = {
+    state: 'disabled',
+    reason: null,
+    lastSyncedAt: null,
+    deferredOps: 0,
+    issues: 0,
+    cleanupBlocked: false,
+  };
   /** @type {Set<(s: SyncStatus) => void>} */
   const listeners = new Set();
   /** @type {import('../../src/core/ports/credentialStore.js').WebDavCredentials | null} */

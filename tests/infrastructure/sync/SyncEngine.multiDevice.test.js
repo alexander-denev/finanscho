@@ -2,19 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { InMemoryWebDav, networkError } from '../../helpers/InMemoryWebDav.js';
 import { createDevice, syncUntilQuiet } from '../../helpers/simulatedDevice.js';
 import { createRandom } from '../../helpers/random.js';
+import { canonicalJson } from '../../../src/infrastructure/sync/merge.js';
 
 /** @typedef {Awaited<ReturnType<typeof createDevice>>} Device */
 
 /**
  * @param {Device[]} devices
+ * @param {{ stubs?: boolean }} [options] compare with tombstones reduced to stubs (compaction and
+ *   pruning drop tombstone fields older than the delete, which users never see)
  * @returns {Promise<void>}
  */
-async function expectConverged(devices) {
-  const [first, ...rest] = await Promise.all(devices.map((d) => d.snapshot()));
+async function expectConverged(devices, options = {}) {
+  const [first, ...rest] = await Promise.all(
+    devices.map((d) => (options.stubs ? d.stubSnapshot() : d.snapshot())),
+  );
   for (const other of rest) expect(other).toBe(first);
+  // Same records in the same order; key order is not meaningful (checkpoints rebuild records).
   const lists = await Promise.all(
     devices.map(async (d) =>
-      JSON.stringify((await d.services.transactions.query({ limit: 10_000 })).items),
+      canonicalJson((await d.services.transactions.query({ limit: 10_000 })).items),
     ),
   );
   for (const list of lists.slice(1)) expect(list).toBe(lists[0]);
@@ -113,14 +119,19 @@ describe('multi-device sync convergence', () => {
     expect((await c.services.accounts.get(joint.id)).name).toBe('Household');
   });
 
-  it('converges for randomized offline histories and sync orders (property)', async () => {
+  it('converges for randomized histories, sync orders, compaction, and pruning (property)', async () => {
+    // Guards against a vacuous pass: the histories must really compact and prune.
+    let compactions = 0;
+    let pruned = 0;
     for (let seed = 1; seed <= 12; seed += 1) {
       const rnd = createRandom(seed);
       const server = new InMemoryWebDav();
+      // A low threshold makes devices compact on their own every few dozen ops.
+      const compactMinOps = 15 + rnd.int(30);
       const devices = [
-        await createDevice(server, 'A'),
-        await createDevice(server, 'B', { clockIso: '2024-05-15T08:00:00.000Z' }),
-        await createDevice(server, 'C', { clockIso: '2024-05-15T12:00:00.000Z' }),
+        await createDevice(server, 'A', { compactMinOps }),
+        await createDevice(server, 'B', { clockIso: '2024-05-15T08:00:00.000Z', compactMinOps }),
+        await createDevice(server, 'C', { clockIso: '2024-05-15T12:00:00.000Z', compactMinOps }),
       ];
       const shared = await devices[0].services.accounts.create({
         name: 'Shared',
@@ -157,11 +168,15 @@ describe('multi-device sync convergence', () => {
         } else if (action === 4 && visible.length > 0) {
           await d.services.transactions.remove(rnd.pick(visible).id);
         } else if (action === 5) {
-          await d.services.budgets.set({
-            categoryId: rnd.pick(categories),
-            month: '2024-05',
-            limit: String(1 + rnd.int(900)),
-          });
+          // Repeated edits: many ops, constant state — the workload compaction exists for.
+          const edits = 1 + rnd.int(25);
+          for (let i = 0; i < edits; i += 1) {
+            await d.services.budgets.set({
+              categoryId: rnd.pick(categories),
+              month: '2024-05',
+              limit: String(1 + rnd.int(900)),
+            });
+          }
         } else if (action === 6 && rnd.next() < 0.3) {
           await d.services.recurring.create({
             frequency: rnd.pick(['daily', 'weekly', 'monthly']),
@@ -177,6 +192,9 @@ describe('multi-device sync convergence', () => {
           });
         } else if (action === 7) {
           d.clock.advance(rnd.int(3) * 3_600_000 + rnd.int(60_000));
+        } else if (action === 8 && rnd.next() < 0.3) {
+          // Local-only: every tombstone becomes a stub right away.
+          pruned += await d.recorder.pruneTombstones(d.clock.nowMs(), 0);
         } else {
           if (rnd.next() < 0.15) {
             server.failNext({
@@ -185,12 +203,32 @@ describe('multi-device sync convergence', () => {
               error: networkError(),
             });
           }
-          await d.sync().catch(() => d.restart());
+          if (rnd.next() < 0.1) {
+            server.failNext({ method: 'DELETE', pathIncludes: d.deviceId, status: 405 });
+          }
+          const run = rnd.next() < 0.2 ? () => d.engine.compactNow() : () => d.sync();
+          await run().then(
+            (result) => {
+              if (result.compacted) compactions += 1;
+            },
+            () => d.restart(),
+          );
         }
       }
       server.clearFailures();
       await syncUntilQuiet(devices);
-      await expectConverged(devices);
+      await expectConverged(devices, { stubs: true });
+      // A device joining now bootstraps from checkpoints and frontiers and sees the same data.
+      // Same day as the latest device, so it materializes no recurring occurrence the others lack.
+      const clockIso = devices
+        .map((d) => d.clock.nowIso())
+        .sort()
+        .at(-1);
+      const late = await createDevice(server, 'L', { clockIso });
+      await late.sync();
+      await expectConverged([...devices, late], { stubs: true });
     }
+    expect(compactions).toBeGreaterThan(5);
+    expect(pruned).toBeGreaterThan(0);
   }, 60_000);
 });

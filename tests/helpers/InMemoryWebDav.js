@@ -12,7 +12,8 @@ import { SyncError } from '../../src/core/errors.js';
 /**
  * Fake WebDAV server implementing the HttpAdapter port for tests. Behaves like a real server:
  * Basic auth, MKCOL (405 when existing, 409 when the parent is missing), PUT (409 without a parent
- * collection), GET (404), and PROPFIND Depth 1 with a DAV: multistatus body.
+ * collection), GET (404), PROPFIND Depth 1 with a DAV: multistatus body, and DELETE (recursive for
+ * collections, 404 when missing).
  */
 export class InMemoryWebDav {
   /** @type {Map<string, string>} */
@@ -104,9 +105,25 @@ export class InMemoryWebDav {
         return { status: 404, body: '' };
       case 'PROPFIND':
         return this.#propfind(path, headers.Depth ?? 'infinity');
+      case 'DELETE':
+        return this.#delete(path);
       default:
         return { status: 405, body: '' };
     }
+  }
+
+  /**
+   * Deletes a file, or a collection recursively.
+   * @param {string} path
+   */
+  #delete(path) {
+    if (this.files.delete(path)) return { status: 204, body: '' };
+    if (!this.collections.has(path)) return { status: 404, body: '' };
+    for (const c of [...this.collections]) {
+      if (c === path || c.startsWith(`${path}/`)) this.collections.delete(c);
+    }
+    for (const f of [...this.files.keys()]) if (f.startsWith(`${path}/`)) this.files.delete(f);
+    return { status: 204, body: '' };
   }
 
   /**

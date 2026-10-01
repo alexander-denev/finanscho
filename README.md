@@ -87,12 +87,14 @@ only to its own folder on the server, so devices can never overwrite each other'
 
 ### Server requirements
 
-- WebDAV with `GET`, `PUT`, `MKCOL`, and `PROPFIND` (Depth 0 and 1), and HTTP Basic auth.
+- WebDAV with `GET`, `PUT`, `MKCOL`, `PROPFIND` (Depth 0 and 1), and `DELETE`, and HTTP Basic
+  auth.
 - HTTPS is strongly recommended (credentials are sent with every request).
 - **CORS** (required on every platform, including iPhone): the server must allow cross-origin
   requests from the app's origin:
   - allowed origins: the origin you host Finanscho on;
-  - allowed methods: `GET, PUT, PROPFIND, MKCOL, OPTIONS`;
+  - allowed methods: `GET, PUT, PROPFIND, MKCOL, DELETE, OPTIONS` (without `DELETE` sync works, but
+    old files are never cleaned up);
   - allowed headers: `Authorization, Content-Type, Depth, Cache-Control`;
   - `OPTIONS` preflight requests must succeed without authentication.
 
@@ -134,6 +136,7 @@ Start with [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`CLAUDE.md`](CLAU
 - No currency conversion: totals are grouped per currency. Budgets count spending in accounts of
   the budget's currency only.
 - Credentials are stored in IndexedDB, the only durable storage a web app has (D35).
-- The server keeps every operation forever (no snapshot compaction); tombstones are never purged.
+- Deleted records leave a small stub (about 150 bytes) forever, so other devices never resurrect
+  them (D40). Each device's server log is compacted into checkpoints (D39).
 - No CSV/OFX import, charts, or end-to-end encryption.
 - English only (all strings are ready for translation in `src/ui/i18n/en.js`).

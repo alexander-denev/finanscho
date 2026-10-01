@@ -121,6 +121,14 @@ UPPER_SNAKE_CASE only for true constants, `onX` for callback props.
 - Never write to a vault whose `format` is newer than supported. Validate every downloaded file.
 - Seeds use `SEED_HLC` (minimum clock); occurrences use the rule's `_clocks.createdAt`; backup
   import and vault switches replay records through `ChangeRecorder` with their original clocks.
+- **Compaction** (SYNC_PROTOCOL §10, D39): a device re-queues its full state as a checkpoint
+  (`queueCheckpoint`, empty outbox only), publishes it, trims its own head to the checkpoint, and
+  deletes its own superseded files. Readers below a checkpoint just apply it; the frontier raises
+  other cursors in the same IDB transaction. The vault format stays 1. Cleanup failures are never
+  sync errors (`cleanupBlocked`).
+- **Tombstone stubs** (D40): a stub keeps `id`, `deleted`, `updatedAt` and fields newer than the
+  delete. Checkpoints publish stubs; `pruneTombstones` shrinks 30-day-old tombstones locally.
+  Stubs are never purged.
 - Transport: one adapter, `FetchHttpAdapter`, on every platform; the server needs CORS
   (DECISIONS D35). Platform detection (`detectPlatform`) only picks the default device name and
   install instructions, never features.

@@ -346,3 +346,59 @@ protected.
   backup download moved from `BackupSettings` into `ui/hooks/useBackupExport.js` for the same
   reason. The banner's buttons sit under the text rather than in `InlineMessage`'s side action
   slot, which squeezed the text into a narrow column on phones (seen in a headless-Edge capture).
+
+### D39. Per-device checkpoints, no format bump
+
+The server used to keep every op forever, a new device replayed every op of every device, and
+orphans from crashed pushes were never removed. Each device now compacts its own log into a
+checkpoint (SYNC_PROTOCOL §10):
+
+- **Why per device, and why no format bump.** Merge is a join, so a device's full state covers
+  every op it published or applied. Re-queuing that state (original clocks, new seqs) and trimming
+  the head to it keeps every reader correct: readers already tolerate gaps (D22) and re-applying
+  ops is a no-op. Only the device's own files change, so single-writer holds, and old clients
+  read compacted logs unchanged (they ignore the optional `checkpoint` field). `VAULT_FORMAT`
+  stays 1.
+- **Full state, not own-authored fields.** Backup imports and vault switches replay other devices'
+  records through this device (D16, D22), so "own" fields are not a clean subset. The full state
+  is always correct; the frontier tells readers which other devices' ops it covers.
+- **Frontier excludes devices with deferred ops** (D15): those ops are not in the state.
+- **Size guard (addition to the plan).** Besides the `max(5000, last checkpoint size)` trigger, a
+  checkpoint is queued only if it is smaller than the log the head lists (`maxOps`). Without it, a
+  device with a small own log but a large shared state would grow its log by compacting. The
+  randomized test first ran with zero compactions because of this guard; it now includes a
+  repeated-edit workload and asserts that compactions and pruning actually happen.
+- **Cleanup rule (generalized).** Cleanup deletes every own segment file that the current head
+  does not list and that ends at or before `lastSeq` (the plan: "below the checkpoint start").
+  Before any checkpoint, heads only grow, so such files were never listed: they are crash orphans.
+  Files past `lastSeq` are kept, since a pending push may still publish them.
+- **Cleanup failures are separate (deviation).** They go into `SyncResult.cleanupIssues`, not
+  `issues`, because the UI maps `issues` to "files on the server were damaged". The status gets
+  `cleanupBlocked`; the cycle still succeeds and there is no backoff.
+- **Cursor pruning.** Cursors of devices no longer listed under `devices/` are dropped at the
+  start of a pull.
+- **Known limitation (pre-existing, now slightly sharper).** Two tabs of the same browser profile
+  share one device ID and outbox but run separate engines; they could already race on the head.
+  Cleanup could additionally delete a file the other tab just listed. Readers recover on the next
+  cycle; a cross-tab lock (Web Locks API) is the proper fix.
+
+### D40. Tombstone stubs, kept forever
+
+Tombstones are never purged: recurring materialization skips IDs that exist in any state (SYNC_PROTOCOL
+§3: deleting an occurrence is permanent), and `_clocks.deleted` must keep beating late
+ops. They shrink instead: checkpoints publish stubs, and `pruneTombstones` rewrites tombstones
+older than 30 days as stubs at startup (local only, no ops; stubs leave the `date`/`accountId`
+indexes).
+
+**Stub rule (refined from the plan).** The plan kept only `id`, `deleted`, `updatedAt`. A stub here
+also keeps **every field whose clock is newer than `_clocks.deleted`**. Fields older than the
+delete can go: an un-delete must rewrite every field with a clock that beats the delete, so it
+beats them too. A field newer than the delete must stay: a full rewrite older than that edit can
+still win `deleted`, and then the edit's value must win too. With today's code budgets are only
+rewritten in full, so the plan's rule would also be safe; the refined rule costs almost nothing
+and stays correct if a newer client sends a partial edit. A regression test sends such a partial
+edit directly and fails with the plan's rule.
+
+Devices can differ in whether a tombstone still carries its older fields (a replica that pruned it
+may receive old field ops again). Visible data is identical; tests compare snapshots with every
+tombstone reduced to its stub. Remaining growth is about 150 bytes per deletion.

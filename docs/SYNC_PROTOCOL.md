@@ -34,8 +34,9 @@ Every synced entity record (`accounts`, `categories`, `transactions`, `budgets`,
 
 - `_clocks` maps each field name to the HLC string of the op that last wrote it. `id` has no
   clock.
-- Deletion is a tombstone: `deleted: true` with its own clock. Tombstones are kept forever (v1 has
-  no compaction) and hidden from every query.
+- Deletion is a tombstone: `deleted: true` with its own clock, hidden from every query.
+  Tombstones are never purged, but old ones shrink to **stubs** (§10.5): `id`, `deleted`,
+  `updatedAt`, and any field written after the delete, with their clocks.
 - A record is **visible** only when `deleted !== true` and `createdAt` is present. A record can be
   temporarily incomplete when an edit from device B arrives before the create from device A; it
   stays hidden until the create arrives.
@@ -174,6 +175,25 @@ that merges every op, advances the HLC (`receive`), and advances that device's c
   }
   ```
 
+- After a compaction the head also carries an optional `checkpoint` (§10.2), and its `segments`
+  start at the checkpoint instead of at seq 1:
+
+  ```json
+  {
+    "lastSeq": 9120,
+    "segments": [
+      { "file": "000000008701-000000009040.json", "startSeq": 8701, "endSeq": 9040 },
+      { "file": "000000009041-000000009120.json", "startSeq": 9041, "endSeq": 9120 }
+    ],
+    "checkpoint": {
+      "startSeq": 8701,
+      "endSeq": 9040,
+      "frontier": { "a71e…": 3310, "c9d2…": 512 },
+      "createdAt": "2026-10-02T08:00:00.000Z"
+    }
+  }
+  ```
+
 ## 6. Sync cycle
 
 A cycle is **pull, then push**. Only one cycle runs at a time (a mutex in `SyncEngine`); a
@@ -189,9 +209,11 @@ request during a running cycle is coalesced into one follow-up cycle.
 
 ### 6.2 Pull
 
-1. `PROPFIND` (Depth: 1) on `devices/` to list device folders; skip our own.
-2. For each remote device, `GET devices/<id>/head.json`. Validate it. If `lastSeq` is greater than
-   our cursor for that device, fetch the segments that contain seqs after the cursor, in order.
+1. `PROPFIND` (Depth: 1) on `devices/` to list device folders; skip our own. Cursors of devices
+   that are no longer listed are dropped (a device that returns has seqs above any stale cursor).
+2. `GET` and validate every remote `head.json` first. Then, device by device (the one whose
+   unread checkpoint covers the most unread ops of others first, §10.4), if `lastSeq` is greater
+   than our cursor for that device, fetch the segments that contain seqs after the cursor, in order.
 3. For each segment: validate it (array of well-formed ops, all from that device, seqs contiguous
    and matching the file name). In **one IndexedDB transaction**, merge every op with
    `seq > cursor` and set the cursor to the segment's last seq.
@@ -207,8 +229,11 @@ request during a running cycle is coalesced into one follow-up cycle.
    the head, so readers never see a head pointing at a missing file.
 4. Only after both succeed, delete those ops from the outbox. Repeat until the outbox is empty.
 
-The device's own `head.json` is read at the start of the push (and cached) so the segment list is
-preserved.
+The device's own `head.json` is read at the start of the push (and cached) so the segment list (and
+any `checkpoint`) is preserved.
+
+After a successful pull and push, the cycle runs **maintenance**: compaction when due and cleanup
+of superseded files (§10). Maintenance failures never fail the cycle.
 
 ### 6.4 Crash safety
 
@@ -218,6 +243,8 @@ preserved.
 | After segment PUT, before head PUT | Readers do not see the segment (head unchanged). The ops are still in the outbox; the next push rewrites the same segment file (same seqs) and then the head. |
 | After head PUT, before outbox trim | The ops are published. The next push finds `head.lastSeq ≥` those seqs and simply trims them from the outbox without re-uploading.                            |
 | During pull, mid-segment           | The IDB transaction for that segment rolls back; the cursor has not moved, so the segment is re-applied (merge is idempotent).                                |
+
+Compaction adds its own rows; see §10.6.
 
 ## 7. Versioning and safety
 
@@ -235,15 +262,18 @@ WebDAV over HTTP with Basic auth, implemented in `WebDavClient` on top of an `ht
 - `put(path, body)` — `PUT` with `Content-Type: application/json`.
 - `list(path)` — `PROPFIND` with `Depth: 1`, parsing the multistatus XML with `DOMParser`
   (elements matched by `namespaceURI === 'DAV:'` and `localName`, so any prefix works).
+- `delete(path)` — `DELETE`; a path ending in `/` deletes a collection and everything in it
+  (RFC 4918 §9.6). 404 counts as success. Used only for a device's own superseded files (§10.3).
 - `checkAccess()` — `PROPFIND` with `Depth: 0` on the server URL; used by "Test connection",
   which never writes.
 
 There is one adapter, `FetchHttpAdapter` (`fetch`), on every platform (DECISIONS D35). The WebDAV
 server must therefore send CORS headers for the app's origin on every platform, including iOS:
-allowed methods `GET, PUT, PROPFIND, MKCOL, OPTIONS`, request headers
+allowed methods `GET, PUT, PROPFIND, MKCOL, DELETE, OPTIONS`, request headers
 `Authorization, Content-Type, Depth, Cache-Control`, and preflight `OPTIONS` requests answered
 without authentication. For local development, set `WEBDAV_PROXY_TARGET` in `.env.local` and use
-`http://localhost:5173/webdav-proxy/…` as the server URL (Vite dev-server proxy).
+`http://localhost:5173/webdav-proxy/…` as the server URL (Vite dev-server proxy). Without `DELETE`
+sync still works; only cleanup of superseded files is blocked (`cleanupBlocked` in the status).
 
 ### Changing vaults
 
@@ -263,3 +293,103 @@ exponentially (5 s, 10 s, 20 s … capped at 5 minutes). Auth, format, and confi
 get no backoff retries; the regular triggers (resume, the 5-minute interval, "Sync now", and
 changing the settings) still try again. Recurring materialization also runs at local midnight while
 the app is open.
+
+## 10. Compaction
+
+Without compaction every segment stays on the server, every head lists them all, and a new device
+replays every op of every device from seq 1. Compaction bounds each device's log with
+**per-device checkpoints**. The vault format stays 1: old clients read compacted logs correctly
+and ignore the new head field, and a device still writes only its own folder.
+
+### 10.1 Checkpoints
+
+Merge is a join (§2), so a device's full local state — every record with its per-field clocks —
+contains, in lattice terms, every op it has ever published, and every remote op it applied. A
+checkpoint re-queues that state as fresh ops with new seqs, keeping the original clocks
+(`ChangeRecorder.queueCheckpoint`, one IndexedDB transaction):
+
+- it runs only with an **empty outbox** (every earlier op is published) and no other checkpoint
+  pending; local writes land entirely before (then it waits) or after it;
+- it emits one op per distinct field clock per record (`recordToOps`), with tombstones reduced to
+  stubs (§10.5); cursors are **kept**;
+- it records the **frontier**: our cursor for each remote device, except devices with deferred ops
+  (§7), whose ops are not in our state;
+- it stores `meta.pendingCheckpoint = { startSeq, endSeq, frontier, createdAt }`.
+
+The full state, not just this device's own fields, is checkpointed, so the checkpoint stays correct
+after backup imports and vault switches, which replay other devices' records through this device.
+
+**When.** A device compacts at the end of a successful cycle when more than
+`max(5000, size of its last checkpoint)` of its own ops follow that checkpoint, and only if the
+checkpoint is smaller than the log it replaces. Its server log stays below about twice its state
+plus 5000 ops, and compaction traffic is a constant fraction of normal sync traffic. "Clean up
+server data" (`compactNow`) compacts whenever that makes the log smaller and always cleans up.
+
+### 10.2 Publishing
+
+The checkpoint ops are pushed like any other ops, with two rules:
+
+1. A segment never straddles `pendingCheckpoint.endSeq`.
+2. The head PUT for the segment ending at `endSeq` lists only segments with
+   `startSeq ≥ checkpoint.startSeq` and records `checkpoint`. Every later head carries it on.
+   Then `pendingCheckpoint` is cleared and `meta.gcPending` set.
+
+`checkpoint` is validated by readers: its range must be exactly a contiguous run of listed segments
+and the frontier must map device IDs to non-negative safe integers. An invalid checkpoint is
+ignored, never fatal.
+
+### 10.3 Cleanup
+
+While `meta.gcPending` is set (and on "Clean up server data"), the device lists its own `ops/`
+folder and deletes every segment file that its current head does not list and that ends at or
+before `lastSeq`: files superseded by the checkpoint and orphans from crashed pushes. Files past
+`lastSeq` may still be published by a later push and are kept. A failed `DELETE` (for example
+`405`, or a network error when the server's CORS rules do not allow `DELETE`) stops cleanup for
+that cycle, is reported in `cleanupIssues` and as `cleanupBlocked` in the status, and is retried
+next cycle; it never causes backoff or an error state.
+
+A reader that fetched the previous head may find a deleted file `missing`; it is reported as an
+issue for that cycle, and the next cycle reads the new head.
+
+### 10.4 Reading checkpoints and the frontier shortcut
+
+A reader whose cursor is below the checkpoint simply applies it: the trimmed ops are contained in
+the checkpoint's state, and readers already tolerate gaps between segments (§8, "Changing
+vaults"). Re-applying ops is a no-op. A client from before compaction does exactly this and
+converges.
+
+A current client also uses the frontier. When it applies the segment that ends at
+`checkpoint.endSeq`, it holds every op of the checkpoint, so it holds every op of each frontier
+device up to that seq. In the **same IndexedDB transaction** it raises those cursors to
+`max(cursor, frontier[id])` (`applyRemote`'s `frontier` argument). To make the most of this, a
+pull reads all heads first and applies the device whose unread checkpoint covers the most unread
+ops of others first. A new device therefore downloads roughly one full snapshot plus tails, not
+every device's full history.
+
+### 10.5 Tombstone stubs
+
+A stub keeps `id`, `deleted`, `updatedAt`, and every field whose clock is newer than
+`_clocks.deleted`, each with its clock. Dropping older fields is safe because nothing un-deletes a
+record without rewriting every field (accounts and categories are archived, never deleted; budgets
+are re-set in full, `deleted: false` included), and such a rewrite must beat the delete clock to
+win `deleted`, so it beats every dropped field too. Fields written after the delete must stay: a
+rewrite older than them may still win `deleted`.
+
+- Checkpoints always publish tombstones as stubs.
+- `ChangeRecorder.pruneTombstones` rewrites tombstones deleted more than 30 days ago as stubs at
+  startup. This is local only (no ops) and drops them from the `date`/`accountId` indexes.
+- **Stubs are never purged**: recurring materialization relies on the ID existing (§3), and
+  `_clocks.deleted` must keep beating late ops. The remaining growth is about 150 bytes per
+  deletion.
+
+Devices may differ in whether a tombstone still carries its older fields; what users see is the
+same. Tests compare snapshots with tombstones reduced to stubs.
+
+### 10.6 Crash safety
+
+| Crash point                                         | Effect                                                                                                                                                         |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| While queueing the checkpoint                       | The IDB transaction rolls back; nothing was queued.                                                                                                            |
+| After a checkpoint segment PUT, before its head PUT | The head still lists the old segments; the checkpoint ops are still in the outbox and `pendingCheckpoint` is set. The next push rewrites the segment and head. |
+| After the checkpoint head PUT, before the trim      | The next push sees `lastSeq ≥ endSeq`, clears `pendingCheckpoint`, sets `gcPending`, and trims the outbox without re-uploading.                                |
+| During cleanup                                      | `gcPending` is still set; the next cycle lists `ops/` again and deletes what is left.                                                                          |

@@ -10,7 +10,15 @@ import { SyncError } from '../../../src/core/errors.js';
 import { ChangeFeed } from '../../../src/shared/ChangeFeed.js';
 
 const creds = { url: 'https://dav.test/dav', vaultPath: 'finanscho', username: 'u', password: 'p' };
-const ok = { pulled: 0, pushed: 0, deferred: 0, issues: [] };
+const ok = {
+  pulled: 0,
+  pushed: 0,
+  deferred: 0,
+  issues: [],
+  cleanupIssues: /** @type {string[]} */ ([]),
+  cleanupBlocked: false,
+  compacted: false,
+};
 
 function setup({ stored = /** @type {typeof creds | null} */ (creds) } = {}) {
   /** @type {Map<string, unknown>} */
@@ -71,6 +79,24 @@ describe('SyncScheduler', () => {
     await vi.advanceTimersByTimeAsync(INTERVAL_MS * 2);
     expect(engine.sync).not.toHaveBeenCalled();
     expect(scheduler.getStatus().state).toBe('disabled');
+  });
+
+  it('reports blocked cleanup in the status without treating it as a sync error', async () => {
+    const { scheduler, engine } = setup();
+    engine.sync.mockResolvedValueOnce({
+      ...ok,
+      cleanupIssues: ['DELETE refused'],
+      cleanupBlocked: true,
+    });
+    await scheduler.start();
+    expect(scheduler.getStatus()).toMatchObject({
+      state: 'idle',
+      reason: null,
+      issues: 0,
+      cleanupBlocked: true,
+    });
+    await scheduler.syncNow();
+    expect(scheduler.getStatus().cleanupBlocked).toBe(false);
   });
 
   it('syncs on start, on resume, 5 s after local writes, and every 5 minutes', async () => {

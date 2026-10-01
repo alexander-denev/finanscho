@@ -71,7 +71,14 @@ export class SyncScheduler {
   /** @type {{ sync: () => Promise<SyncResult> } | null} */
   #engine = null;
   /** @type {SyncStatus} */
-  #status = { state: 'disabled', reason: null, lastSyncedAt: null, deferredOps: 0, issues: 0 };
+  #status = {
+    state: 'disabled',
+    reason: null,
+    lastSyncedAt: null,
+    deferredOps: 0,
+    issues: 0,
+    cleanupBlocked: false,
+  };
   /** @type {Set<(status: SyncStatus) => void>} */
   #listeners = new Set();
   /** @type {Array<() => void>} */
@@ -157,7 +164,13 @@ export class SyncScheduler {
       this.#debounced.cancel();
       this.#stopInterval();
       this.#clearRetry();
-      this.#update({ state: 'disabled', reason: null, deferredOps: 0, issues: 0 });
+      this.#update({
+        state: 'disabled',
+        reason: null,
+        deferredOps: 0,
+        issues: 0,
+        cleanupBlocked: false,
+      });
       return;
     }
     const synced = await this.#deps.settings.get(SYNCED_VAULT_KEY);
@@ -215,6 +228,7 @@ export class SyncScheduler {
         lastSyncedAt: now,
         deferredOps: result.deferred,
         issues: result.issues.length,
+        cleanupBlocked: result.cleanupBlocked,
       });
     } catch (error) {
       if (engine !== this.#engine) return;
