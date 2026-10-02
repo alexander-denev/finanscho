@@ -14,7 +14,6 @@ import { controlClassName, Field } from './Field.jsx';
  * @property {string} [placeholder]
  * @property {number} [maxLength]
  * @property {boolean} [spellcheck]
- * @property {string} [list] id of a `<datalist>` with suggestions
  * @property {import('preact').ComponentChildren} [prefix]
  */
 

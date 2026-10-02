@@ -12,6 +12,7 @@
 }
 
 .frame {
+  position: relative;
   display: flex;
   align-items: center;
   min-height: var(--tap);

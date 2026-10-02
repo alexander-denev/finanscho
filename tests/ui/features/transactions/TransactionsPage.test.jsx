@@ -131,13 +131,10 @@ describe('TransactionsPage', () => {
     // The payee comes before the category and account it can fill.
     const category = within(dialog).getByLabelText('Category (optional)');
     expect(payee.compareDocumentPosition(category) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    await waitFor(() => expect(payee.getAttribute('list')).toBeTruthy());
-    const options = document
-      .getElementById(payee.getAttribute('list') ?? '')
-      ?.querySelectorAll('option');
-    expect([...(options ?? [])].map((o) => o.value)).toEqual(['Lidl']);
-
-    fireEvent.input(payee, { target: { value: 'lidl' } });
+    fireEvent.input(payee, { target: { value: 'li' } });
+    const option = await within(dialog).findByRole('option', { name: 'Lidl, Groceries' });
+    fireEvent.mouseDown(option);
+    expect(payee.value).toBe('Lidl');
     expect(/** @type {HTMLSelectElement} */ (category).value).toBe('seed:groceries');
     expect(/** @type {HTMLSelectElement} */ (within(dialog).getByLabelText('Account')).value).toBe(
       card.id,

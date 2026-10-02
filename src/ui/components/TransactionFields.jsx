@@ -1,6 +1,6 @@
-import { useId } from 'preact/hooks';
 import { useSignal } from '@preact/signals';
 import { t } from '../i18n/i18n.js';
+import { ComboBox } from './ComboBox.jsx';
 import { DateInput } from './DateInput.jsx';
 import { MoneyInput } from './MoneyInput.jsx';
 import { SegmentedControl } from './SegmentedControl.jsx';
@@ -70,7 +70,6 @@ export function TransactionFields({
   payeeSuggestions = [],
   autofillAccount = false,
 }) {
-  const payeeListId = useId();
   const accountTouched = useSignal(false);
   const isTransfer = value.kind === 'transfer';
   const currency = accounts.find((a) => a.id === value.accountId)?.currency ?? 'EUR';
@@ -125,21 +124,17 @@ export function TransactionFields({
           onChange({ kind, categoryId: keep ? value.categoryId : '' });
         }}
       />
-      <TextField
+      <ComboBox
         label={t('common.optional', { label: t('transactions.payee') })}
         value={value.payee}
         error={error('payee')}
-        autoComplete="off"
-        list={payeeSuggestions.length > 0 ? payeeListId : undefined}
+        options={payeeSuggestions.map((s) => ({
+          value: s.payee,
+          // Shows what choosing the payee fills in.
+          detail: categories.find((c) => c.id === s.categoryId)?.name,
+        }))}
         onInput={changePayee}
       />
-      {payeeSuggestions.length > 0 && (
-        <datalist id={payeeListId}>
-          {payeeSuggestions.map((s) => (
-            <option key={s.payee} value={s.payee} />
-          ))}
-        </datalist>
-      )}
       {!isTransfer && (
         <Select
           label={t('common.optional', { label: t('transactions.category') })}

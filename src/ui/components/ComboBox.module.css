@@ -1,0 +1,56 @@
+/* Positioned against the field frame (`.frame` in Field.module.css is `position: relative`). */
+.list {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + var(--sp-1));
+  left: calc(-1 * var(--hairline));
+  right: calc(-1 * var(--hairline));
+  margin: 0;
+  padding: var(--sp-1) 0;
+  border: var(--hairline) solid var(--c-rule);
+  border-radius: var(--r-md);
+  background: var(--c-raised);
+  box-shadow: var(--shadow-float);
+  list-style: none;
+}
+
+.list[hidden] {
+  display: none;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  min-height: var(--tap);
+  padding: 0 var(--sp-3);
+  color: var(--c-ink);
+  cursor: pointer;
+}
+
+.option:hover,
+.active {
+  background: var(--c-pine-soft);
+}
+
+.active {
+  box-shadow: inset var(--focus-ring) 0 0 var(--c-pine);
+}
+
+.text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.match {
+  font-weight: var(--fw-strong);
+}
+
+.detail {
+  flex: none;
+  color: var(--c-muted);
+  font-size: var(--fs-sm);
+}

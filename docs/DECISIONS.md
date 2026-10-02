@@ -498,10 +498,17 @@ today (a duplicate when the old rule had already created today's).
   category must still exist and match the kind. Transfers never have one. The transaction filter
   gains "Uncategorized" (`TransactionQuery.uncategorized`, transfers excluded); uncategorized
   spending counts in totals but in no budget.
-- **Payee suggestions** use a native `<datalist>` (no dependency; works offline and on mobile
-  keyboards). `TransactionRepository.recentPayees` walks the date index newest first, reading at
-  most 2000 records, and returns up to 200 distinct payees (case-insensitive) with the kind,
-  category, and account of their latest use. They are loaded when the transaction dialog opens.
+- **Payee suggestions** use our own `ComboBox` (`ui/components`), a WAI-ARIA combobox with a
+  listbox popup, no dependency. A native `<datalist>` was tried first and dropped: browsers render
+  it differently, it can't be styled, and it can't show what a payee fills in. The list opens on
+  focus (recent payees) and typing, ranks prefix matches before substring matches, bolds the
+  match, and shows the category the payee will fill. ↓/↑/Enter choose; Escape closes only the
+  list (its keydown is stopped so the enclosing `<dialog>` stays open); options are chosen on
+  `mousedown` so focus stays in the input. Each option has an explicit `aria-label`
+  ("Lidl, Groceries") because its text is split into highlight and detail spans.
+  `TransactionRepository.recentPayees` walks the date index newest first, reading at most 2000
+  records, and returns up to 200 distinct payees (case-insensitive) with the kind, category, and
+  account of their latest use. They are loaded when the transaction dialog opens.
 - Picking a known payee fills the category (and its kind) when none is chosen yet, and, for new
   transactions only, the account unless the user picked one. The payee field moved above the
   category and account it can fill (user decision).
