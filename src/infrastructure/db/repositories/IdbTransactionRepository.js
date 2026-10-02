@@ -165,6 +165,20 @@ export class IdbTransactionRepository {
   }
 
   /**
+   * @param {string} categoryId
+   * @returns {Promise<boolean>}
+   */
+  async hasAnyForCategory(categoryId) {
+    const index = this.#db.transaction(STORES.transactions).store.index(TX_INDEXES.categoryId);
+    let cursor = await index.openCursor(categoryId);
+    while (cursor) {
+      if (isVisible(/** @type {StoredRecord} */ (cursor.value))) return true;
+      cursor = await cursor.continue();
+    }
+    return false;
+  }
+
+  /**
    * Walks the `[date, createdAt]` index newest first, reading at most PAYEE_SCAN_LIMIT records.
    * @param {number} limit maximum number of distinct payees
    * @returns {Promise<import('../../../core/ports/repositories.js').PayeeSuggestion[]>}

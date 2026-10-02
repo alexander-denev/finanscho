@@ -33,3 +33,7 @@
 .name {
   flex: 1;
 }
+
+.message {
+  margin-top: var(--sp-4);
+}

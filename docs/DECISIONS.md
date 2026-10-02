@@ -289,7 +289,7 @@ discard a half-filled form; a visible prompt was rejected as needless friction.
   claims the page later through `clientsClaim`). Found with a headless-Edge check: the new worker
   activated but the old bundle kept running.
 - It is injected into the composition root (`main.jsx` loads `virtual:pwa-register`, which only
-  exists in Vite builds) so it can read the sync status and show the "works offline" toast.
+  exists in Vite builds) so it can read the sync status. (It also showed a "works offline" toast once; removed in D46.)
 - Registration errors go to `globalThis.reportError`, which logs without throwing (and needs no
   `no-console` exception). A failed update is reported and retried at the next safe moment.
 - Hourly `registration.update()` while visible and online.
@@ -512,3 +512,50 @@ today (a duplicate when the old rule had already created today's).
 - Picking a known payee fills the category (and its kind) when none is chosen yet, and, for new
   transactions only, the account unless the user picked one. The payee field moved above the
   category and account it can fill (user decision).
+
+### D46. No "works offline" toast; "Add account" buttons open the dialog
+
+- The one-time "Finanscho now works offline" toast after the first service worker install is gone
+  (user decision): it appeared on every first visit and told people nothing they had to act on.
+  `startServiceWorker` no longer takes `onOfflineReady`.
+- Every "Add account" button opens the add-account dialog. Outside the Accounts page (dashboard
+  empty state, the transaction dialog's "add an account first" message) they go to
+  `/accounts/new`, a route that renders `AccountsPage` with the add dialog open; closing or saving
+  returns to `/accounts`. Chosen over a global account dialog (like `TransactionDialog` in
+  `App.jsx`) to reuse the router and keep the dialog inside its feature (user decision). The
+  transaction dialog closes before navigating, so the two dialogs never stack.
+
+### D47. History routing instead of hash routing
+
+- URLs are plain paths (`/accounts`) instead of `#/accounts` (user decision; the app is hosted at
+  the root of its origin). `historyRouter.js` replaces `hashRouter.js`: `pushState` + `popstate`,
+  and one `click` listener on the window that navigates plain same-origin `<a>` clicks in place
+  (skipped for modifier keys, non-primary buttons, `target`, `download`, other origins). Links stay
+  ordinary `<a href="/x">`, so no `Link` component is needed.
+- Old hash links (bookmarks, an installed app's saved URL) are rewritten once at startup with
+  `replaceState('#/x' → '/x')`.
+- `base` is `'/'` (was `'./'`) and `index.html` links the favicon and touch icon root-absolute;
+  relative asset URLs would resolve under the current path (`/accounts/assets/…`) on a deep link.
+  The manifest keeps `id: './'`, `start_url`/`scope: '.'`: they resolve against
+  `/manifest.webmanifest`, so the installed app's identity is unchanged.
+- Offline, the service worker's `navigateFallback: 'index.html'` serves every path. Online without
+  the worker (first visit, forced reload), the host must fall back to `index.html` for unknown
+  paths (README → Hosting); Vite's dev and preview servers already do.
+
+### D48. Deleting categories: only unused ones, like accounts
+
+Users asked to delete categories, not only archive them. Same rule as accounts (D42): **a category
+that no transaction and no recurring rule (including ended ones) uses can be deleted**; anything
+else is archived. `CategoryService.remove` throws `InUseError` (`categoryInUse`); the Categories
+page checks first and explains instead of offering the confirm dialog. Seeded categories can be
+deleted too; seeding runs once per install and never overwrites a record in any state, so a
+deleted seed stays deleted.
+
+- **Budgets don't count as use.** A budget is a plan, not history: once its category is deleted,
+  `BudgetService.forMonth` already skips it and recurring budgets are no longer copied forward
+  (only listed categories are). The budget records stay, so a restored category gets them back.
+- **Concurrent use** is handled like accounts: after every pull, `CategoryService.restoreUsed`
+  writes `deleted: false` for each deleted category (still carrying its fields) that a visible
+  transaction or rule uses. `TransactionRepository.hasAnyForCategory` walks the `categoryId`
+  index.
+- Deleting the category the transaction list is filtered by clears that filter.

@@ -16,6 +16,7 @@ export const ROUTES = [
   { path: '/transactions', component: TransactionsPage },
   { path: '/budgets', component: BudgetsPage },
   { path: '/accounts', component: AccountsPage },
+  { path: '/accounts/new', component: AccountsPage },
   { path: '/recurring', component: RecurringPage },
   { path: '/categories', component: CategoriesPage },
   { path: '/settings', component: SettingsPage },

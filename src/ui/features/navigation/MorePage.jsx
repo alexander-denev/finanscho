@@ -5,9 +5,9 @@ import styles from './MorePage.module.css';
 
 /** @type {ReadonlyArray<{ href: string, labelKey: string, icon: import('../../components/Icon.jsx').IconName }>} */
 const LINKS = [
-  { href: '#/recurring', labelKey: 'nav.recurring', icon: 'repeat' },
-  { href: '#/categories', labelKey: 'nav.categories', icon: 'tag' },
-  { href: '#/settings', labelKey: 'nav.settings', icon: 'settings' },
+  { href: '/recurring', labelKey: 'nav.recurring', icon: 'repeat' },
+  { href: '/categories', labelKey: 'nav.categories', icon: 'tag' },
+  { href: '/settings', labelKey: 'nav.settings', icon: 'settings' },
 ];
 
 /**

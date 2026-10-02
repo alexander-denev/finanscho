@@ -90,7 +90,8 @@ export default defineConfig(({ mode }) => {
     resolve: {
       dedupe: ['preact', '@preact/signals-core'],
     },
-    base: './',
+    // Root-absolute asset URLs: the history router serves deep paths like /accounts/new (D47).
+    base: '/',
     server: {
       proxy: webDavProxy(env),
     },

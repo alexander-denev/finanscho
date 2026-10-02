@@ -110,8 +110,9 @@ UPPER_SNAKE_CASE only for true constants, `onX` for callback props.
   occurrences.
 - **Recurring budgets** (`recurring: true`) are copied forward month by month up to the current
   month with the source's clock, stopping at any month that has a record in any state (D43).
-- Accounts can be deleted only when no transaction or rule uses them; after a pull, deleted
-  accounts that are used again are restored (D42). Income and expenses may be uncategorized.
+- Accounts and categories can be deleted only when no transaction or rule uses them; after a
+  pull, deleted ones that are used again are restored (D42, D48). Income and expenses may be
+  uncategorized.
 - v1 totals are grouped by currency (default EUR); no conversion.
 
 ## Sync invariants

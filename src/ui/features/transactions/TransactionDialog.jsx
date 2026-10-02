@@ -1,7 +1,7 @@
 import { useSignal, useSignalEffect } from '@preact/signals';
 import { toDecimalString } from '../../../core/domain/money.js';
 import { useStores } from '../../context/StoresProvider.jsx';
-import { ButtonLink } from '../../components/ButtonLink.jsx';
+import { Button } from '../../components/Button.jsx';
 import { ConfirmDialog } from '../../components/ConfirmDialog.jsx';
 import { Dialog } from '../../components/Dialog.jsx';
 import { InlineMessage } from '../../components/InlineMessage.jsx';
@@ -43,7 +43,7 @@ function toInput(draft) {
  * @returns {import('preact').JSX.Element}
  */
 export function TransactionDialog({ request, onClose }) {
-  const { transactions, accounts, categories, toasts } = useStores();
+  const { transactions, accounts, categories, toasts, router } = useStores();
   const initial = useSignal(/** @type {TransactionDraft | null} */ (null));
   const loadError = useSignal(/** @type {string | null} */ (null));
   const payeeSuggestions = useSignal(
@@ -120,6 +120,12 @@ export function TransactionDialog({ request, onClose }) {
     onClose();
   };
 
+  // Close first so the add-account dialog never opens on top of this one.
+  const addAccount = () => {
+    onClose();
+    router.navigate('/accounts/new');
+  };
+
   const remove = async () => {
     confirmDelete.value = false;
     if (!editingId) return;
@@ -135,9 +141,9 @@ export function TransactionDialog({ request, onClose }) {
         {!loadError.value && needsAccount && (
           <InlineMessage
             action={
-              <ButtonLink href="#/accounts" variant="primary">
+              <Button variant="primary" onClick={addAccount}>
                 {t('accounts.add')}
-              </ButtonLink>
+              </Button>
             }
           >
             {t('transactions.needAccount')}

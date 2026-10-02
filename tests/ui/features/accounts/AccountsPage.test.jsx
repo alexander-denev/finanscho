@@ -27,6 +27,15 @@ describe('AccountsPage', () => {
     expect(row.textContent).toContain('Negative -€250.00');
   });
 
+  it('opens the add dialog on /accounts/new and returns to /accounts when closed', async () => {
+    const ui = await createUiStores({ path: '/accounts/new' });
+    renderWithStores(<AccountsPage />, ui.stores);
+    const dialog = await screen.findByRole('dialog', { name: 'Add account' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(ui.stores.router.currentPath.value).toBe('/accounts');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
   it('rejects an invalid opening balance inline', async () => {
     const ui = await createUiStores({ path: '/accounts' });
     renderWithStores(<AccountsPage />, ui.stores);

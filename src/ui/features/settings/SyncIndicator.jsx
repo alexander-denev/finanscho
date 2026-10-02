@@ -19,7 +19,7 @@ export function SyncIndicator() {
           ? 'sync'
           : 'cloud';
   return (
-    <a href="#/settings" className={`${styles.root} ${styles[status.state]}`} aria-live="polite">
+    <a href="/settings" className={`${styles.root} ${styles[status.state]}`} aria-live="polite">
       <Icon name={icon} />
       <span className={styles.text}>
         <span className={styles.state}>{t(`sync.state.${status.state}`)}</span>

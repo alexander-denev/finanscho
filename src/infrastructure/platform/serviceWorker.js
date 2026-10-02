@@ -19,7 +19,6 @@ export const UPDATE_CHECK_MS = 60 * 60_000;
  * @typedef {(options: {
  *   immediate?: boolean,
  *   onNeedRefresh?: () => void,
- *   onOfflineReady?: () => void,
  *   onRegisteredSW?: (swUrl: string, registration: ServiceWorkerRegistration | undefined) => void,
  *   onRegisterError?: (error: unknown) => void,
  * }) => (reloadPage?: boolean) => Promise<void>} RegisterSw
@@ -31,7 +30,6 @@ export const UPDATE_CHECK_MS = 60 * 60_000;
  * @property {Document} document
  * @property {() => boolean} isBusy true while reloading could lose work (open form, running sync)
  * @property {(listener: () => void) => () => void} onBusyChange notifies when `isBusy` may have changed
- * @property {() => void} onOfflineReady called once, when the app is first cached for offline use
  * @property {Pick<ServiceWorkerContainer, 'addEventListener' | 'removeEventListener'>} [serviceWorker] defaults to `navigator.serviceWorker`
  * @property {() => void} [reload] defaults to `location.reload()`
  * @property {(error: unknown) => void} [reportError] defaults to `globalThis.reportError` (logs, never throws)
@@ -49,7 +47,6 @@ export function startServiceWorker({
   document,
   isBusy,
   onBusyChange,
-  onOfflineReady,
   serviceWorker = globalThis.navigator?.serviceWorker,
   reload = () => globalThis.location.reload(),
   reportError = (error) => globalThis.reportError?.(error),
@@ -81,7 +78,6 @@ export function startServiceWorker({
       updateReady = true;
       applyIfSafe();
     },
-    onOfflineReady,
     onRegisteredSW(_swUrl, registration) {
       if (!registration) return;
       interval = timers.setInterval(() => {

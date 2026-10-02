@@ -10,7 +10,7 @@ describe('DashboardPage', () => {
     renderWithStores(<DashboardPage />, ui.stores);
     expect(screen.getByRole('heading', { name: 'Start by adding an account' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Add an account' }).getAttribute('href')).toBe(
-      '#/accounts',
+      '/accounts/new',
     );
   });
 
@@ -21,7 +21,7 @@ describe('DashboardPage', () => {
     renderWithStores(<DashboardPage />, ui.stores);
     expect(screen.getByText('Bring your data to this app')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Open Settings' }).getAttribute('href')).toBe(
-      '#/settings',
+      '/settings',
     );
   });
 

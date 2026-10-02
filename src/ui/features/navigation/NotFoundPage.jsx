@@ -14,7 +14,7 @@ export function NotFoundPage() {
       <EmptyState
         title={t('notFound.body')}
         action={
-          <ButtonLink href="#/" variant="primary">
+          <ButtonLink href="/" variant="primary">
             {t('notFound.action')}
           </ButtonLink>
         }

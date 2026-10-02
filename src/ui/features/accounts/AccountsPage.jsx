@@ -16,9 +16,12 @@ import styles from './AccountsPage.module.css';
 
 /** @typedef {import('./AccountForm.jsx').AccountDraft} AccountDraft */
 
+/** The route that opens the add dialog, linked from outside the Accounts page. */
+const ADD_PATH = '/accounts/new';
+
 /**
  * Accounts with balances; add, edit, archive, restore, and delete unused ones. Archived accounts
- * live on their own tab, shown once there is one.
+ * live on their own tab, shown once there is one. On `/accounts/new` the add dialog opens at once.
  * @returns {import('preact').JSX.Element}
  */
 export function AccountsPage() {
@@ -28,7 +31,9 @@ export function AccountsPage() {
   const confirmDelete = useSignal(false);
   const deleteBlocked = useSignal(false);
   const deleteError = useSignal(/** @type {string | null} */ (null));
-  const editingId = editing.value?.id ?? null;
+  const adding = router.currentPath.value === ADD_PATH;
+  const request = adding ? { id: null } : editing.value;
+  const editingId = request?.id ?? null;
   const account = editingId ? accounts.byId.value.get(editingId) : undefined;
   const archivedItems = accounts.archived.value;
   const showArchived = tab.value === 'archived' && archivedItems.length > 0;
@@ -55,6 +60,7 @@ export function AccountsPage() {
     confirmDelete.value = false;
     deleteBlocked.value = false;
     deleteError.value = null;
+    if (router.currentPath.peek() === ADD_PATH) router.navigate('/accounts');
   };
 
   /**
@@ -210,7 +216,7 @@ export function AccountsPage() {
         </>
       )}
       <Dialog
-        open={editing.value !== null && !confirmDelete.value}
+        open={request !== null && !confirmDelete.value}
         title={editingId ? t('accounts.edit') : t('accounts.add')}
         onClose={close}
       >
@@ -252,7 +258,7 @@ export function AccountsPage() {
         )}
       </Dialog>
       <ConfirmDialog
-        open={editing.value !== null && confirmDelete.value}
+        open={request !== null && confirmDelete.value}
         title={t('accounts.delete')}
         message={t('accounts.deleteConfirm', { name: account?.name ?? '' })}
         confirmLabel={t('accounts.delete')}

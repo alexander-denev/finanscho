@@ -235,7 +235,8 @@ request during a running cycle is coalesced into one follow-up cycle.
    `seq > cursor` and set the cursor to the segment's last seq.
 4. A malformed head or segment is skipped and reported (`malformed`) without crashing; the cursor
    does not move past it, so it is retried next cycle. Other devices still sync.
-5. After pulling, restore deleted accounts that a transaction or rule uses again (D42), run
+5. After pulling, restore deleted accounts and categories that a transaction or rule uses again
+   (D42, D48), run
    recurring materialization (transactions, then budgets), then publish
    `{ entities, source: 'remote' }`.
 

@@ -40,7 +40,7 @@ export function DashboardPage() {
               <p className={styles.hintTitle}>{t('install.freshHint.title')}</p>
               <p>{t('install.freshHint.body')}</p>
               <div className={styles.hintAction}>
-                <ButtonLink href="#/settings" icon="settings">
+                <ButtonLink href="/settings" icon="settings">
                   {t('install.freshHint.action')}
                 </ButtonLink>
               </div>
@@ -51,7 +51,7 @@ export function DashboardPage() {
           title={t('dashboard.empty.title')}
           body={t('dashboard.empty.body')}
           action={
-            <ButtonLink href="#/accounts" variant="primary" icon="plus">
+            <ButtonLink href="/accounts/new" variant="primary" icon="plus">
               {t('dashboard.empty.action')}
             </ButtonLink>
           }
@@ -96,7 +96,7 @@ export function DashboardPage() {
       <DashboardSection
         id="dash-accounts"
         title={t('dashboard.accounts')}
-        link={{ href: '#/accounts', label: t('dashboard.viewAll') }}
+        link={{ href: '/accounts', label: t('dashboard.viewAll') }}
       >
         <BalanceList
           items={summary.balances.map(({ account, balanceMinor }) => ({
@@ -151,7 +151,7 @@ export function DashboardPage() {
         id="dash-budgets"
         title={t('dashboard.budgets')}
         link={{
-          href: '#/budgets',
+          href: '/budgets',
           label: lines.length ? t('dashboard.viewAll') : t('dashboard.setBudgets'),
         }}
       >
@@ -188,7 +188,7 @@ export function DashboardPage() {
       <DashboardSection
         id="dash-upcoming"
         title={t('dashboard.upcoming')}
-        link={{ href: '#/recurring', label: t('dashboard.viewAll') }}
+        link={{ href: '/recurring', label: t('dashboard.viewAll') }}
       >
         <UpcomingList items={upcoming} emptyText={t('dashboard.noUpcoming')} />
       </DashboardSection>

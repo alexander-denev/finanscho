@@ -118,6 +118,8 @@ export const EN = Object.freeze({
     'This backup comes from a newer version of Finanscho. Update the app, then import it.',
   'errors.accountInUse':
     'This account has transactions or recurring transactions, so it can’t be deleted. Archive it instead.',
+  'errors.categoryInUse':
+    'This category has transactions or recurring transactions, so it can’t be deleted. Archive it instead.',
   'errors.unknown': 'Something went wrong. Try again.',
   'errors.load': 'Couldn’t load this data. Try again.',
 
@@ -153,6 +155,7 @@ export const EN = Object.freeze({
   'toast.accountSaved': 'Account saved.',
   'toast.accountDeleted': 'Account deleted.',
   'toast.categorySaved': 'Category saved.',
+  'toast.categoryDeleted': 'Category deleted.',
   'toast.budgetSaved': 'Budget saved.',
   'toast.budgetRemoved': 'Budget removed.',
   'toast.budgetsCopied': 'Copied {count} budgets from last month.',
@@ -166,7 +169,6 @@ export const EN = Object.freeze({
   'toast.syncDisconnected': 'Sync turned off. Your data stays on this device.',
   'toast.exported': 'Backup saved as {file}.',
   'toast.imported': 'Backup imported. {count} records updated.',
-  'toast.offlineReady': 'Finanscho now works offline.',
   'toast.deviceRemoved': 'Removed {name} from the sync folder.',
   'toast.cleanedUp': 'Server data cleaned up.',
   'toast.installed': 'Finanscho is installed. Open it from your home screen or app list.',
@@ -230,6 +232,10 @@ export const EN = Object.freeze({
   'categories.expense': 'Expense categories',
   'categories.income': 'Income categories',
   'categories.archivedSection': 'Archived categories',
+  'categories.delete': 'Delete category',
+  'categories.deleteConfirm': 'Delete {name}? This can’t be undone.',
+  'categories.deleteBlocked':
+    'This category has transactions or recurring transactions, so it can’t be deleted. Archive it instead.',
 
   'transactions.title': 'Transactions',
   'transactions.add': 'Add transaction',

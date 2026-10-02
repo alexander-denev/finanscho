@@ -1,4 +1,4 @@
-import { matchRoute } from './hashRouter.js';
+import { matchRoute } from './historyRouter.js';
 
 /**
  * @typedef {object} PageRoute
@@ -8,13 +8,13 @@ import { matchRoute } from './hashRouter.js';
 
 /**
  * @typedef {object} RouterViewProps
- * @property {import('./hashRouter.js').HashRouter} router
+ * @property {import('./historyRouter.js').HistoryRouter} router
  * @property {readonly PageRoute[]} routes
  * @property {import('preact').ComponentType<Record<string, never>>} notFound
  */
 
 /**
- * Renders the page for the current hash path.
+ * Renders the page for the current path.
  * @param {RouterViewProps} props
  * @returns {import('preact').JSX.Element}
  */

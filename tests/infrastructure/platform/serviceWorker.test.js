@@ -23,7 +23,6 @@ function setup({ busy = false } = {}) {
   /** @type {Set<() => void>} */
   const busyListeners = new Set();
   const state = { busy };
-  const onOfflineReady = vi.fn();
   const reportError = vi.fn();
   const serviceWorker = new EventTarget();
   const reload = vi.fn();
@@ -38,7 +37,6 @@ function setup({ busy = false } = {}) {
       busyListeners.add(listener);
       return () => busyListeners.delete(listener);
     },
-    onOfflineReady,
     serviceWorker,
     reload,
     reportError,
@@ -47,7 +45,6 @@ function setup({ busy = false } = {}) {
   return {
     options: () => options,
     updateSW,
-    onOfflineReady,
     reportError,
     stop,
     state,
@@ -67,11 +64,9 @@ afterEach(() => {
 });
 
 describe('startServiceWorker', () => {
-  it('registers immediately and forwards offline-ready and registration errors', () => {
+  it('registers immediately and forwards registration errors', () => {
     const sw = setup();
     expect(sw.options().immediate).toBe(true);
-    sw.options().onOfflineReady?.();
-    expect(sw.onOfflineReady).toHaveBeenCalledTimes(1);
     const error = new Error('blocked');
     sw.options().onRegisterError?.(error);
     expect(sw.reportError).toHaveBeenCalledWith(error);

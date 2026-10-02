@@ -76,7 +76,7 @@ export function AppShell({ onAddTransaction, children }) {
         {t('app.skipToContent')}
       </button>
       <nav className={styles.nav} aria-label={t('nav.label')}>
-        <a href="#/" className={styles.brand}>
+        <a href="/" className={styles.brand}>
           {t('app.name')}
         </a>
         <ul className={styles.items}>
@@ -85,7 +85,7 @@ export function AppShell({ onAddTransaction, children }) {
             return (
               <li key={item.path} className={styles[item.placement]}>
                 <a
-                  href={`#${item.path}`}
+                  href={item.path}
                   className={`${styles.link} ${active ? styles.active : ''}`}
                   aria-current={active ? 'page' : undefined}
                 >

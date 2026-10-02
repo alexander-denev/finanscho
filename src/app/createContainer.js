@@ -44,7 +44,7 @@ import { SettingsStore } from '../state/SettingsStore.js';
 import { SyncStore } from '../state/SyncStore.js';
 import { ToastStore } from '../state/ToastStore.js';
 import { InstallStore } from '../state/InstallStore.js';
-import { createHashRouter } from '../ui/router/hashRouter.js';
+import { createHistoryRouter } from '../ui/router/historyRouter.js';
 import { t } from '../ui/i18n/i18n.js';
 import { bindStoreInvalidation } from './storeInvalidation.js';
 
@@ -135,6 +135,7 @@ export async function createContainer({ window, registerServiceWorker }) {
         getDeviceName: () => device.getDeviceName(),
         afterPull: async () => {
           await accountService.restoreUsed();
+          await categoryService.restoreUsed();
           await recurringService.materialize();
           await budgetService.materialize();
         },
@@ -165,7 +166,7 @@ export async function createContainer({ window, registerServiceWorker }) {
       transactionsStore: transactions,
       clock,
     }),
-    router: createHashRouter(window),
+    router: createHistoryRouter(window),
     clock: { today: () => clock.today(), nowMs: () => clock.nowMs() },
   };
 
@@ -210,7 +211,6 @@ export async function createContainer({ window, registerServiceWorker }) {
           window.document.querySelector('dialog[open]') !== null ||
           scheduler.getStatus().state === 'syncing',
         onBusyChange: (listener) => scheduler.subscribe(() => listener()),
-        onOfflineReady: () => stores.toasts.show('toast.offlineReady'),
       })
     : () => {};
 

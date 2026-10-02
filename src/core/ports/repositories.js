@@ -31,6 +31,8 @@
  * @property {(category: Category) => Promise<void>} create
  * @property {(id: string, changes: Partial<Category>) => Promise<void>} update
  * @property {(categories: Category[]) => Promise<number>} seed writes absent records with the minimum clock; returns how many were written
+ * @property {(id: string, updatedAt: string) => Promise<void>} remove
+ * @property {() => Promise<Category[]>} listDeleted deleted categories that still carry all their fields (not yet shrunk to stubs)
  */
 
 /**
@@ -61,6 +63,7 @@
  * @property {(from: LocalDate, to: LocalDate) => Promise<Transaction[]>} listInRange inclusive; use only for bounded ranges (a month)
  * @property {(accountId: string) => Promise<number>} netForAccount signed sum of all effects on the account
  * @property {(accountId: string) => Promise<boolean>} hasAnyForAccount whether a visible transaction uses the account on either side
+ * @property {(categoryId: string) => Promise<boolean>} hasAnyForCategory whether a visible transaction uses the category
  * @property {(limit: number) => Promise<PayeeSuggestion[]>} recentPayees distinct payees (case-insensitive), most recently used first, from a bounded scan of recent transactions
  * @property {(transaction: Transaction) => Promise<void>} create
  * @property {(id: string, changes: Partial<Transaction>) => Promise<void>} update

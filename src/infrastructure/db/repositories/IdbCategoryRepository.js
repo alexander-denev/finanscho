@@ -1,6 +1,6 @@
 import { SEED_HLC } from '../../sync/HybridLogicalClock.js';
 import { STORES } from '../database.js';
-import { byName, fieldsOf, visibleEntities, visibleEntity } from './recordMapping.js';
+import { byName, fieldsOf, toEntity, visibleEntities, visibleEntity } from './recordMapping.js';
 
 /** @typedef {import('../../../core/domain/category.js').Category} Category */
 /** @typedef {import('../../../core/domain/category.js').CategoryKind} CategoryKind */
@@ -84,5 +84,24 @@ export class IdbCategoryRepository {
       }
     });
     return written;
+  }
+
+  /**
+   * @param {string} id
+   * @param {string} updatedAt
+   * @returns {Promise<void>}
+   */
+  async remove(id, updatedAt) {
+    await this.#recorder.write({ entity: 'categories', id, fields: { deleted: true, updatedAt } });
+  }
+
+  /** @returns {Promise<Category[]>} */
+  async listDeleted() {
+    const records = /** @type {import('../../sync/merge.js').StoredRecord[]} */ (
+      await this.#db.getAll(STORES.categories)
+    );
+    return records
+      .filter((r) => r.deleted === true && typeof r.createdAt === 'string')
+      .map((r) => toEntity(r));
   }
 }

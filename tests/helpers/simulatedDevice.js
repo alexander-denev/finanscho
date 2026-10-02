@@ -64,6 +64,7 @@ export async function createDevice(server, name, options = {}) {
       getDeviceName: async () => name,
       afterPull: async () => {
         await t.services.accounts.restoreUsed();
+        await t.services.categories.restoreUsed();
         await t.services.recurring.materialize();
         await t.services.budgets.materialize();
       },

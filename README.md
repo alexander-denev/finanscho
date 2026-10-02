@@ -51,13 +51,17 @@ npm run build
 npm run preview    # or deploy dist/ to any static host
 ```
 
-The app uses hash routing (`#/transactions`), so no server rewrites are needed. Install it from
+The app uses path URLs (`/transactions`) and must be served from the root of its origin. Install it from
 the browser's "Install app" menu (desktop and Android) or **Share → Add to Home Screen** (iPhone and
 iPad); it works offline after the first visit.
 
 ### Hosting
 
-Deploy `dist/` to any static host. For the offline app and updates to work reliably:
+Deploy `dist/` to the root (`/`) of any static host. For the offline app and updates to work reliably:
+
+- **Serve `index.html` for unknown paths** (SPA fallback, e.g. nginx `try_files $uri /index.html`),
+  so a first visit or a forced reload on a page such as `/accounts` works. Once the service worker
+  is installed it answers these navigations itself.
 
 - **Serve over HTTPS.** Service workers, installation, and persistent storage need a secure
   context (`http://localhost` is fine for testing).

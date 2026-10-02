@@ -118,8 +118,8 @@ if (!existsSync(join(DIST, 'sw.js'))) {
 
   // --- index.html -----------------------------------------------------------------------------
   const html = readFileSync(join(DIST, 'index.html'), 'utf8');
-  expect(/<link rel="manifest" href="\.\/manifest\.webmanifest"/.test(html), 'manifest link');
-  expect(/<link rel="apple-touch-icon" href="\.\/apple-touch-icon\.png"/.test(html), 'touch icon');
+  expect(/<link rel="manifest" href="\/manifest\.webmanifest"/.test(html), 'manifest link');
+  expect(/<link rel="apple-touch-icon" href="\/apple-touch-icon\.png"/.test(html), 'touch icon');
 
   // --- Precache completeness ------------------------------------------------------------------
   const sw = readFileSync(join(DIST, 'sw.js'), 'utf8');

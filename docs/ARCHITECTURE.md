@@ -68,7 +68,8 @@ next to the field, linked with `aria-describedby`.
 SyncScheduler ──► SyncEngine.sync()  (mutex; pull then push)
     pull: PROPFIND devices/ → GET head.json → GET segments → ChangeRecorder.applyRemote()
           (merge + cursor advance in one IndexedDB transaction per segment)
-    ──► AccountService.restoreUsed()      deleted accounts used again on another device come back
+    ──► AccountService/CategoryService.restoreUsed()  deleted accounts and categories used again
+                                          on another device come back
     ──► RecurringService.materialize(), BudgetService.materialize()
     ──► ChangeFeed.publish({ source: 'remote' })  → the same store invalidation path
     push: segment PUT → head PUT → outbox trim
@@ -130,8 +131,8 @@ gate if a file escapes the precache or the manifest is incomplete (D37).
 Updates are applied silently by `serviceWorker.js` (D36): when a new version is waiting, it
 activates it and reloads only if no `<dialog>` is open and no sync cycle is running, or the page is
 hidden. Otherwise it waits for a dialog `close`, a sync status change, or `visibilitychange`.
-It checks for a new version hourly while visible and shows one "works offline" toast after the
-first install.
+It checks for a new version hourly while visible. The first install is silent: no "works offline"
+toast (D46).
 
 ## Sync
 
@@ -140,8 +141,11 @@ deterministic IDs, crash safety, and transport details.
 
 ## UI
 
-- Hash router (`#/transactions`) built on a signal, created by the composition root, so it works
-  on any static host without server rewrites.
+- History router (`/transactions`, `historyRouter.js`) built on a signal, created by the
+  composition root. It handles plain same-origin link clicks in place and rewrites old hash links
+  (`#/transactions`). The app is served from `/` (`base: '/'`); the service worker answers every
+  navigation with `index.html`, and the host must do the same for a first visit or a forced reload
+  on a deep path (D47).
 - `AppShell`: bottom tab bar and floating "Add transaction" button below 1024 px; left sidebar
   from 1024 px (CSS only). Hosts the sync indicator and toasts; moves focus to `<main>` after
   navigation.
