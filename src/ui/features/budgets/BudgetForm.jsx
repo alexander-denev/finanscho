@@ -2,11 +2,12 @@ import { Button } from '../../components/Button.jsx';
 import { InlineMessage } from '../../components/InlineMessage.jsx';
 import { MoneyInput } from '../../components/MoneyInput.jsx';
 import { Select } from '../../components/Select.jsx';
+import { Switch } from '../../components/Switch.jsx';
 import { useFormState } from '../../hooks/useFormState.js';
 import { t } from '../../i18n/i18n.js';
 import styles from './BudgetForm.module.css';
 
-/** @typedef {{ categoryId: string, limit: string }} BudgetDraft */
+/** @typedef {{ categoryId: string, limit: string, recurring: boolean }} BudgetDraft */
 
 /**
  * @typedef {object} BudgetFormProps
@@ -58,6 +59,12 @@ export function BudgetForm({ initial, categories, currency, onSubmit, onCancel, 
         error={error('limit')}
         required
         onInput={(limit) => form.update({ limit })}
+      />
+      <Switch
+        label={t('budgets.recurring')}
+        hint={t('budgets.recurringHint')}
+        checked={draft.recurring}
+        onChange={(recurring) => form.update({ recurring })}
       />
       {form.formError.value && <InlineMessage tone="error">{form.formError.value}</InlineMessage>}
       <div className={styles.actions}>

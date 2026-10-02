@@ -25,6 +25,9 @@ const EDITABLE_FIELDS = /** @type {const} */ ([
   'note',
 ]);
 
+/** How many distinct payees are suggested at most. */
+export const PAYEE_SUGGESTION_LIMIT = 200;
+
 /** Use cases for transactions. */
 export class TransactionService {
   #transactions;
@@ -63,6 +66,15 @@ export class TransactionService {
     const transaction = await this.#transactions.get(id);
     if (!transaction) throw new NotFoundError('transaction', id);
     return transaction;
+  }
+
+  /**
+   * Payees used before, most recent first, with the kind, category, and account of their latest
+   * transaction (for autofill).
+   * @returns {Promise<import('../ports/repositories.js').PayeeSuggestion[]>}
+   */
+  payeeSuggestions() {
+    return this.#transactions.recentPayees(PAYEE_SUGGESTION_LIMIT);
   }
 
   /**

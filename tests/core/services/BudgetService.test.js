@@ -76,6 +76,70 @@ describe('BudgetService', () => {
     expect(await t.services.budgets.copyFromPreviousMonth('2024-05')).toBe(0);
   });
 
+  /** @param {string} month */
+  const limitsIn = async (month) =>
+    Object.fromEntries(
+      (await t.services.budgets.forMonth(month)).lines.map((l) => [
+        l.category.id,
+        [l.budget.limitMinor, l.budget.recurring],
+      ]),
+    );
+
+  it('carries a recurring budget into every month up to the current one', async () => {
+    // Today is 2024-05-15.
+    await t.services.budgets.set({
+      categoryId: 'seed:groceries',
+      month: '2024-02',
+      limit: '100',
+      recurring: true,
+    });
+    await t.services.budgets.set({ categoryId: 'seed:dining', month: '2024-02', limit: '50' });
+    for (const month of ['2024-03', '2024-04', '2024-05']) {
+      expect(await limitsIn(month)).toEqual({ 'seed:groceries': [10_000, true] });
+    }
+    expect(await limitsIn('2024-06')).toEqual({});
+    expect(await t.services.budgets.materialize()).toBe(0);
+
+    // A new limit applies from its month on; earlier months keep theirs.
+    await t.services.budgets.set({
+      categoryId: 'seed:groceries',
+      month: '2024-05',
+      limit: '120',
+      recurring: true,
+    });
+    t.clock.set('2024-07-02T08:00:00.000Z');
+    expect(await t.services.budgets.materialize()).toBe(2);
+    expect(await limitsIn('2024-04')).toEqual({ 'seed:groceries': [10_000, true] });
+    expect(await limitsIn('2024-07')).toEqual({ 'seed:groceries': [12_000, true] });
+  });
+
+  it('stops repeating at a removed budget or one switched off', async () => {
+    await t.services.budgets.set({
+      categoryId: 'seed:groceries',
+      month: '2024-05',
+      limit: '100',
+      recurring: true,
+    });
+    await t.services.budgets.set({
+      categoryId: 'seed:dining',
+      month: '2024-05',
+      limit: '50',
+      recurring: true,
+    });
+    t.clock.set('2024-06-02T08:00:00.000Z');
+    expect(await t.services.budgets.materialize()).toBe(2);
+    await t.services.budgets.remove('seed:groceries:2024-06');
+    await t.services.budgets.set({
+      categoryId: 'seed:dining',
+      month: '2024-06',
+      limit: '50',
+      recurring: false,
+    });
+    t.clock.set('2024-09-02T08:00:00.000Z');
+    expect(await t.services.budgets.materialize()).toBe(0);
+    expect(await limitsIn('2024-09')).toEqual({});
+  });
+
   it('rejects budgets for income categories and bad months', async () => {
     await expect(
       t.services.budgets.set({ categoryId: 'seed:salary', month: '2024-05', limit: '1' }),

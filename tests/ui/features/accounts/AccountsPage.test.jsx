@@ -42,6 +42,49 @@ describe('AccountsPage', () => {
     ).toBeTruthy();
   });
 
+  it('deletes an unused account and explains why a used one stays', async () => {
+    const ui = await createUiStores({ path: '/accounts' });
+    const used = await ui.stores.accounts.create({
+      name: 'Used',
+      type: 'checking',
+      currency: 'EUR',
+      openingBalance: '0',
+    });
+    await ui.stores.accounts.create({
+      name: 'Mistake',
+      type: 'cash',
+      currency: 'EUR',
+      openingBalance: '0',
+    });
+    await ui.stores.transactions.save({
+      kind: 'expense',
+      date: '2024-05-10',
+      amount: '1',
+      accountId: used.id,
+    });
+    await ui.settled();
+    renderWithStores(<AccountsPage />, ui.stores);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Used/ }));
+    let dialog = await screen.findByRole('dialog', { name: 'Edit account' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+    expect(
+      await within(dialog).findByText(
+        'This account has transactions or recurring transactions, so it can’t be deleted. Archive it instead.',
+      ),
+    ).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    fireEvent.click(await screen.findByRole('button', { name: /Mistake/ }));
+    dialog = await screen.findByRole('dialog', { name: 'Edit account' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+    const confirm = await screen.findByRole('dialog', { name: 'Delete account' });
+    expect(within(confirm).getByText('Delete Mistake? This can’t be undone.')).toBeTruthy();
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Delete account' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: /Mistake/ })).toBeNull());
+    expect(ui.stores.toasts.toasts.value.map((t) => t.key)).toContain('toast.accountDeleted');
+  });
+
   it('archives and restores an account', async () => {
     const ui = await createUiStores({ path: '/accounts' });
     await ui.stores.accounts.create({
@@ -56,6 +99,7 @@ describe('AccountsPage', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Edit account' });
     expect(within(dialog).queryByLabelText('Currency')).toBeNull();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Archive' }));
+    fireEvent.click(await screen.findByRole('radio', { name: 'Archived (1)' }));
     const archived = await screen.findByRole('list', { name: 'Archived accounts' });
     expect(within(archived).getByRole('button', { name: /Old bank/ })).toBeTruthy();
     fireEvent.click(within(archived).getByRole('button', { name: /Old bank/ }));
@@ -63,5 +107,8 @@ describe('AccountsPage', () => {
     await waitFor(() =>
       expect(screen.queryByRole('list', { name: 'Archived accounts' })).toBeNull(),
     );
+    // With nothing archived, the tabs disappear and the active list is back.
+    expect(screen.queryByRole('radio', { name: /Archived/ })).toBeNull();
+    expect(within(screen.getByRole('list', { name: 'Accounts' })).getByRole('button')).toBeTruthy();
   });
 });

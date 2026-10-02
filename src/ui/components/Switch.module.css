@@ -1,0 +1,87 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  min-height: var(--tap);
+  cursor: pointer;
+}
+
+.label {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+  color: var(--c-ink);
+}
+
+/* The real checkbox covers the track, invisible, so it stays clickable and focusable. */
+.input {
+  position: absolute;
+  right: 0;
+  width: calc(var(--tap) + var(--sp-2));
+  height: var(--tap);
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.track {
+  position: relative;
+  flex: none;
+  width: calc(var(--tap) + var(--sp-2));
+  height: calc(var(--tap) / 2 + var(--sp-1));
+  border: var(--hairline) solid var(--c-rule);
+  border-radius: var(--r-pill);
+  background: var(--c-sunken);
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.track::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: var(--sp-1);
+  width: calc(var(--tap) / 2 - var(--sp-1));
+  height: calc(var(--tap) / 2 - var(--sp-1));
+  border-radius: var(--r-pill);
+  background: var(--c-raised);
+  box-shadow: 0 0 0 var(--hairline) var(--c-rule);
+  transform: translateY(-50%);
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.input:checked + .track {
+  border-color: var(--c-pine);
+  background: var(--c-pine);
+}
+
+.input:checked + .track::after {
+  /* Track width minus borders, both gaps, and the knob. */
+  transform: translate(
+    calc(var(--tap) + var(--sp-2) - 2 * var(--hairline) - var(--sp-1) - var(--tap) / 2),
+    -50%
+  );
+}
+
+.input:focus-visible + .track {
+  outline: var(--focus-ring) solid var(--c-brass);
+  outline-offset: var(--hairline);
+}
+
+.hint {
+  font-size: var(--fs-sm);
+  color: var(--c-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .track,
+  .track::after {
+    transition: none;
+  }
+}

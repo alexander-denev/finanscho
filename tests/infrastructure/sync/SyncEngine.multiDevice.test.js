@@ -119,6 +119,100 @@ describe('multi-device sync convergence', () => {
     expect((await c.services.accounts.get(joint.id)).name).toBe('Household');
   });
 
+  it('restores an account one device deleted while another used it', async () => {
+    const server = new InMemoryWebDav();
+    const a = await createDevice(server, 'A');
+    const b = await createDevice(server, 'B');
+    const wallet = await a.services.accounts.create({
+      name: 'Wallet',
+      type: 'cash',
+      currency: 'EUR',
+      openingBalance: '0',
+    });
+    await a.sync();
+    await b.sync();
+
+    // Offline: A deletes the account while it is still empty; B records a purchase in it.
+    await a.services.accounts.remove(wallet.id);
+    b.clock.advance(60_000);
+    await b.services.transactions.create({
+      kind: 'expense',
+      date: '2024-05-15',
+      amount: '4',
+      accountId: wallet.id,
+    });
+    await syncUntilQuiet([a, b]);
+    await expectConverged([a, b]);
+    for (const d of [a, b]) {
+      expect((await d.services.accounts.get(wallet.id)).name).toBe('Wallet');
+      expect((await d.services.accounts.listWithBalances())[0].balanceMinor).toBe(-400);
+    }
+  });
+
+  it('carries recurring budgets forward on every device, and a user edit beats the copies', async () => {
+    const server = new InMemoryWebDav();
+    const a = await createDevice(server, 'A');
+    const b = await createDevice(server, 'B');
+    await a.services.budgets.set({
+      categoryId: 'seed:groceries',
+      month: '2024-05',
+      limit: '300',
+      recurring: true,
+    });
+    await a.sync();
+    await b.sync();
+
+    // June arrives. Both copy May's budget offline; then A changes June's limit.
+    for (const d of [a, b]) d.clock.set('2024-06-01T07:00:00.000Z');
+    expect(await a.services.budgets.materialize()).toBe(1);
+    expect(await b.services.budgets.materialize()).toBe(1);
+    a.clock.advance(60_000);
+    await a.services.budgets.set({
+      categoryId: 'seed:groceries',
+      month: '2024-06',
+      limit: '320',
+      recurring: true,
+    });
+    await syncUntilQuiet([b, a]);
+    await expectConverged([a, b]);
+    const [june] = (await b.services.budgets.forMonth('2024-06')).lines;
+    expect(june.budget).toMatchObject({ limitMinor: 32_000, recurring: true });
+  });
+
+  it('never creates the dates a resumed rule skipped, on any device', async () => {
+    const server = new InMemoryWebDav();
+    const a = await createDevice(server, 'A');
+    const b = await createDevice(server, 'B');
+    const main = await a.services.accounts.create({
+      name: 'Main',
+      type: 'checking',
+      currency: 'EUR',
+      openingBalance: '0',
+    });
+    const rule = await a.services.recurring.create({
+      frequency: 'monthly',
+      interval: 1,
+      startDate: '2024-05-01',
+      endDate: null,
+      template: { kind: 'expense', amount: '10', accountId: main.id, categoryId: null },
+    });
+    await a.services.recurring.stop(rule.id);
+    await a.sync();
+    await b.sync();
+
+    for (const d of [a, b]) d.clock.set('2024-08-20T07:00:00.000Z');
+    expect(await a.services.recurring.resume(rule.id)).toBe('2024-09-01');
+    await a.sync();
+    await b.sync();
+    for (const d of [a, b]) d.clock.set('2024-09-02T07:00:00.000Z');
+    await b.services.recurring.materialize();
+    await syncUntilQuiet([a, b]);
+    await expectConverged([a, b]);
+    const dates = (await a.services.transactions.query({ limit: 50 })).items.map((x) => x.date);
+    expect(dates).toEqual(['2024-09-01', '2024-05-01']);
+    expect((await b.services.recurring.list()).map((s) => s.rule.id)).toEqual([rule.id]);
+  });
+
   it('converges for randomized histories, sync orders, compaction, and pruning (property)', async () => {
     // Guards against a vacuous pass: the histories must really compact and prune.
     let compactions = 0;

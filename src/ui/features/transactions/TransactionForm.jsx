@@ -15,6 +15,7 @@ import styles from './TransactionForm.module.css';
  * @property {(draft: TransactionDraft) => Promise<void>} onSubmit throws ValidationError for inline errors
  * @property {() => void} onCancel
  * @property {() => void} [onDelete] shown when editing
+ * @property {readonly import('../../components/TransactionFields.jsx').PayeeSuggestion[]} [payeeSuggestions]
  */
 
 /**
@@ -22,7 +23,15 @@ import styles from './TransactionForm.module.css';
  * @param {TransactionFormProps} props
  * @returns {import('preact').JSX.Element}
  */
-export function TransactionForm({ initial, accounts, categories, onSubmit, onCancel, onDelete }) {
+export function TransactionForm({
+  initial,
+  accounts,
+  categories,
+  onSubmit,
+  onCancel,
+  onDelete,
+  payeeSuggestions,
+}) {
   const form = useFormState(initial);
 
   /** @param {SubmitEvent} event */
@@ -39,6 +48,8 @@ export function TransactionForm({ initial, accounts, categories, onSubmit, onCan
         errors={form.errors.value}
         accounts={accounts}
         categories={categories}
+        payeeSuggestions={payeeSuggestions}
+        autofillAccount={!onDelete}
       />
       {form.formError.value && <InlineMessage tone="error">{form.formError.value}</InlineMessage>}
       <div className={styles.actions}>

@@ -1,6 +1,6 @@
 import { ValidationError } from '../errors.js';
 import { addDays, isLocalDate } from './localDate.js';
-import { FREQUENCIES } from './recurrenceSchedule.js';
+import { FREQUENCIES, occurrencesBetween } from './recurrenceSchedule.js';
 import { normalizeTransactionInput } from './transaction.js';
 import { isOneOf, throwIfInvalid } from './validation.js';
 
@@ -21,13 +21,16 @@ export const MAX_INTERVAL = 999;
 
 /**
  * A recurring rule. Schedule and template are immutable after creation; only `endDate` and
- * `deleted` may change. "Editing" ends this rule and creates a new one.
+ * `deleted` may change. Changing the template or schedule ends this rule and creates a new one
+ * whose `previousRuleId` points back here (absent on rules created before that field existed);
+ * stopping, resuming, or moving the end date changes `endDate` in place.
  * @typedef {BaseEntity & {
  *   frequency: Frequency,
  *   interval: number,
  *   startDate: LocalDate,
  *   endDate: LocalDate | null,
  *   template: RuleTemplate,
+ *   previousRuleId?: string | null,
  * }} RecurringRule
  */
 
@@ -115,17 +118,73 @@ export function normalizeRuleInput(input, refs) {
 /**
  * @param {ReturnType<typeof normalizeRuleInput>} fields
  * @param {EntityContext} ctx
+ * @param {string | null} [previousRuleId] the rule this one replaces
  * @returns {RecurringRule}
  */
-export function createRecurringRule(fields, ctx) {
+export function createRecurringRule(fields, ctx, previousRuleId = null) {
   return {
     id: ctx.id,
     ...fields,
     template: { ...fields.template },
+    previousRuleId,
     createdAt: ctx.now,
     updatedAt: ctx.now,
     deleted: false,
   };
+}
+
+/**
+ * Whether two rules repeat the same transaction on the same cadence (ignoring start and end).
+ * @param {Pick<RecurringRule, 'frequency' | 'interval' | 'template'>} a
+ * @param {Pick<RecurringRule, 'frequency' | 'interval' | 'template'>} b
+ * @returns {boolean}
+ */
+export function sameRecurrence(a, b) {
+  if (a.frequency !== b.frequency || a.interval !== b.interval) return false;
+  const keys = /** @type {(keyof RuleTemplate)[]} */ (Object.keys(a.template));
+  return (
+    keys.length === Object.keys(b.template).length &&
+    keys.every((key) => a.template[key] === b.template[key])
+  );
+}
+
+/**
+ * Whether `date` is one of the rule's occurrence dates, ignoring its end date.
+ * @param {RecurringRule} rule
+ * @param {LocalDate} date
+ * @returns {boolean}
+ */
+export function isOnSchedule(rule, date) {
+  return occurrencesBetween({ ...rule, endDate: null }, date, date, 1)[0] === date;
+}
+
+/**
+ * Where a stopped rule picks up again: its first occurrence date on or after today that comes
+ * after its end date, so nothing it already created is created twice.
+ * @param {RecurringRule} rule
+ * @param {LocalDate} today
+ * @returns {LocalDate}
+ */
+export function resumeDate(rule, today) {
+  const dayAfterEnd = rule.endDate === null ? today : addDays(rule.endDate, 1);
+  const from = dayAfterEnd > today ? dayAfterEnd : today;
+  return occurrencesBetween({ ...rule, endDate: null }, from, '9999-12-31', 1)[0];
+}
+
+/**
+ * The occurrence dates a rule skips when it restarts at `effectiveDate`: those after its end
+ * date and before the restart. Empty when the rule has no end date.
+ * @param {RecurringRule} rule
+ * @param {LocalDate} effectiveDate an occurrence date of the rule
+ * @returns {LocalDate[]}
+ */
+export function skippedDates(rule, effectiveDate) {
+  if (rule.endDate === null) return [];
+  return occurrencesBetween(
+    { ...rule, endDate: null },
+    addDays(rule.endDate, 1),
+    addDays(effectiveDate, -1),
+  );
 }
 
 /**

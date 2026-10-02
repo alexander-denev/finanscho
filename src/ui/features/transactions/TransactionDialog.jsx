@@ -46,6 +46,9 @@ export function TransactionDialog({ request, onClose }) {
   const { transactions, accounts, categories, toasts } = useStores();
   const initial = useSignal(/** @type {TransactionDraft | null} */ (null));
   const loadError = useSignal(/** @type {string | null} */ (null));
+  const payeeSuggestions = useSignal(
+    /** @type {import('../../components/TransactionFields.jsx').PayeeSuggestion[]} */ ([]),
+  );
   const confirmDelete = useSignal(false);
   const editingId = request.value?.id ?? null;
 
@@ -83,6 +86,13 @@ export function TransactionDialog({ request, onClose }) {
         note: '',
       };
     };
+    // Suggestions are a convenience: the form opens without them if they fail to load.
+    transactions.payeeSuggestions().then(
+      (suggestions) => {
+        if (!cancelled) payeeSuggestions.value = suggestions;
+      },
+      () => {},
+    );
     load().then(
       (draft) => {
         if (!cancelled) initial.value = draft;
@@ -138,6 +148,7 @@ export function TransactionDialog({ request, onClose }) {
             initial={initial.value}
             accounts={activeAccounts}
             categories={categories.active.value}
+            payeeSuggestions={payeeSuggestions.value}
             onSubmit={save}
             onCancel={onClose}
             onDelete={

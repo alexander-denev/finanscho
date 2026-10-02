@@ -100,11 +100,18 @@ UPPER_SNAKE_CASE only for true constants, `onX` for callback props.
 - IDs: `crypto.randomUUID()` via injected generator; deterministic IDs where devices may create
   the same record: seeded categories `seed:<slug>`, budgets `<categoryId>:<YYYY-MM>`, recurring
   occurrences `<ruleId>:<YYYY-MM-DD>`.
-- **Recurring rules are immutable** after creation except `endDate` and `deleted`. Editing = end the
-  old rule the day before the effective date + create a new rule. Materialization (app start,
-  after sync, local midnight) creates occurrences up to today, max 366 per rule per run, never
-  rewrites an existing ID (even deleted), writes occurrences with the rule's creation clock, and
-  deleting a rule keeps existing occurrences.
+- **Recurring rules are immutable** after creation except `endDate` and `deleted`. Changing the
+  template or cadence = end the old rule the day before the effective date + create a new rule
+  with `previousRuleId` (the list hides replaced rules). Stop, resume, and date-only edits change
+  `endDate` in place; dates skipped while stopped are written as tombstones first (D44).
+  Materialization (app start, after sync, local midnight) creates occurrences up to today, max 366
+  per rule per run, never rewrites an existing ID (even deleted; found by the `<ruleId>:` key
+  prefix), writes occurrences with the rule's creation clock, and deleting a rule keeps existing
+  occurrences.
+- **Recurring budgets** (`recurring: true`) are copied forward month by month up to the current
+  month with the source's clock, stopping at any month that has a record in any state (D43).
+- Accounts can be deleted only when no transaction or rule uses them; after a pull, deleted
+  accounts that are used again are restored (D42). Income and expenses may be uncategorized.
 - v1 totals are grouped by currency (default EUR); no conversion.
 
 ## Sync invariants

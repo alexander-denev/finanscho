@@ -18,6 +18,7 @@ import { createLoadState } from './loadState.js';
  * @typedef {object} TransactionFilter
  * @property {string | null} accountId
  * @property {string | null} categoryId
+ * @property {boolean} uncategorized only income and expenses without a category
  * @property {string | null} month 'YYYY-MM'
  * @property {string} search
  */
@@ -32,7 +33,13 @@ import { createLoadState } from './loadState.js';
 export const PAGE_SIZE = 50;
 
 /** @type {TransactionFilter} */
-const EMPTY_FILTER = { accountId: null, categoryId: null, month: null, search: '' };
+const EMPTY_FILTER = {
+  accountId: null,
+  categoryId: null,
+  uncategorized: false,
+  month: null,
+  search: '',
+};
 
 /**
  * Adds a signed amount to per-currency totals.
@@ -152,11 +159,12 @@ export class TransactionsStore {
 
   /** @returns {Promise<void>} */
   load() {
-    const { accountId, categoryId, month, search } = this.#filter.value;
+    const { accountId, categoryId, uncategorized, month, search } = this.#filter.value;
     const query = {
       limit: this.#limit.value,
       ...(accountId ? { accountId } : {}),
       ...(categoryId ? { categoryId } : {}),
+      ...(uncategorized ? { uncategorized } : {}),
       ...(month ? { month } : {}),
       ...(search.trim() ? { search } : {}),
     };
@@ -236,5 +244,10 @@ export class TransactionsStore {
   /** @returns {Promise<{ date: string, accountId: string | null }>} */
   defaults() {
     return this.#service.defaults();
+  }
+
+  /** @returns {Promise<import('../core/ports/repositories.js').PayeeSuggestion[]>} */
+  payeeSuggestions() {
+    return this.#service.payeeSuggestions();
   }
 }

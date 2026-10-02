@@ -1,5 +1,5 @@
 import { budgetId, budgetProgress, normalizeBudgetInput } from '../domain/budget.js';
-import { addMonthsToYearMonth, isYearMonth } from '../domain/localDate.js';
+import { addMonthsToYearMonth, isYearMonth, yearMonthOf } from '../domain/localDate.js';
 import { DEFAULT_CURRENCY, sumMinor } from '../domain/money.js';
 import { ValidationError } from '../errors.js';
 import { SETTING_KEYS } from './SettingsService.js';
@@ -103,7 +103,36 @@ export class BudgetService {
       deleted: false,
     };
     await this.#budgets.put(budget);
+    if (budget.recurring) await this.materialize();
     return budget;
+  }
+
+  /**
+   * Carries recurring budgets forward: for each active expense category whose newest budget up to
+   * this month repeats, copies it into every later month up to this month. A month with its own
+   * budget, a removed budget, or a budget that doesn't repeat ends the chain.
+   * @param {string} [today]
+   * @returns {Promise<number>} budgets written
+   */
+  async materialize(today = this.#clock.today()) {
+    const month = yearMonthOf(today);
+    const [latest, categories] = await Promise.all([
+      this.#budgets.latestPerCategory(month),
+      this.#categories.list({ kind: 'expense' }),
+    ]);
+    let written = 0;
+    for (const category of categories) {
+      const source = latest.get(category.id)?.budget;
+      if (!source?.recurring || source.month >= month) continue;
+      /** @type {string[]} */
+      const months = [];
+      for (let m = addMonthsToYearMonth(source.month, 1); m <= month;) {
+        months.push(m);
+        m = addMonthsToYearMonth(m, 1);
+      }
+      written += await this.#budgets.copyRecurring(source.id, months);
+    }
+    return written;
   }
 
   /**
@@ -139,6 +168,7 @@ export class BudgetService {
         ...budget,
         id: budgetId(budget.categoryId, month),
         month,
+        recurring: budget.recurring === true,
         createdAt: now,
         updatedAt: now,
         deleted: false,

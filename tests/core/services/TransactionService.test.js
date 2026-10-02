@@ -32,6 +32,69 @@ describe('TransactionService', () => {
     });
   });
 
+  it('records uncategorized income and expenses and filters them', async () => {
+    await t.services.transactions.create({
+      kind: 'expense',
+      date: '2024-05-02',
+      amount: '3',
+      accountId: main.id,
+    });
+    await t.services.transactions.create({
+      kind: 'income',
+      date: '2024-05-03',
+      amount: '4',
+      accountId: main.id,
+      categoryId: '',
+    });
+    await t.services.transactions.create({
+      kind: 'expense',
+      date: '2024-05-04',
+      amount: '5',
+      accountId: main.id,
+      categoryId: 'seed:groceries',
+    });
+    const other = await makeAccount(t, 'Other');
+    await t.services.transactions.create({
+      kind: 'transfer',
+      date: '2024-05-05',
+      amount: '6',
+      accountId: main.id,
+      toAccountId: other.id,
+    });
+    const { items } = await t.services.transactions.query({ limit: 10, uncategorized: true });
+    expect(items.map((tx) => [tx.amountMinor, tx.categoryId])).toEqual([
+      [400, null],
+      [300, null],
+    ]);
+  });
+
+  it('suggests each payee once, most recent first, with its latest kind, category, and account', async () => {
+    const other = await makeAccount(t, 'Other');
+    /**
+     * @param {string} date
+     * @param {string} payee
+     * @param {Partial<import('../../../src/core/domain/transaction.js').TransactionInput>} [over]
+     */
+    const add = (date, payee, over = {}) =>
+      t.services.transactions.create({
+        kind: 'expense',
+        date,
+        amount: '1',
+        accountId: main.id,
+        categoryId: 'seed:groceries',
+        payee,
+        ...over,
+      });
+    await add('2024-05-01', 'Lidl', { categoryId: 'seed:dining' });
+    await add('2024-05-02', 'Bakery');
+    await add('2024-05-03', '  ');
+    await add('2024-05-04', 'lidl', { accountId: other.id });
+    expect(await t.services.transactions.payeeSuggestions()).toEqual([
+      { payee: 'lidl', kind: 'expense', categoryId: 'seed:groceries', accountId: other.id },
+      { payee: 'Bakery', kind: 'expense', categoryId: 'seed:groceries', accountId: main.id },
+    ]);
+  });
+
   it('rejects references to missing accounts and wrong category kinds', async () => {
     expect(
       await asyncFieldErrors(

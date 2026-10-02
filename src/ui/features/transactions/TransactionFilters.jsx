@@ -22,9 +22,11 @@ import styles from './TransactionFilters.module.css';
  */
 
 const SEARCH_DELAY_MS = 250;
+/** Category select value for "Uncategorized"; real category IDs never start with a colon. */
+const UNCATEGORIZED = ':uncategorized';
 
 /**
- * Account, category, month, and text filters for the transaction list.
+ * Account, category (or uncategorized), month, and text filters for the transaction list.
  * @param {TransactionFiltersProps} props
  * @returns {import('preact').JSX.Element}
  */
@@ -41,7 +43,9 @@ export function TransactionFilters({ filter, onChange, onClear, accounts, catego
     SEARCH_DELAY_MS,
   );
   const pushSearch = debouncer.current;
-  const active = Boolean(filter.accountId || filter.categoryId || filter.month || filter.search);
+  const active = Boolean(
+    filter.accountId || filter.categoryId || filter.uncategorized || filter.month || filter.search,
+  );
 
   return (
     <section className={styles.root} aria-label={t('transactions.filters')}>
@@ -57,12 +61,18 @@ export function TransactionFilters({ filter, onChange, onClear, accounts, catego
         />
         <Select
           label={t('transactions.filterCategory')}
-          value={filter.categoryId ?? ''}
+          value={filter.uncategorized ? UNCATEGORIZED : (filter.categoryId ?? '')}
           options={[
             { value: '', label: t('transactions.allCategories') },
+            { value: UNCATEGORIZED, label: t('transactions.uncategorized') },
             ...categories.map((c) => ({ value: c.id, label: c.name })),
           ]}
-          onChange={(value) => onChange({ categoryId: value || null })}
+          onChange={(value) =>
+            onChange({
+              categoryId: value && value !== UNCATEGORIZED ? value : null,
+              uncategorized: value === UNCATEGORIZED,
+            })
+          }
         />
         <TextField
           label={t('transactions.search')}

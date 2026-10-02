@@ -123,4 +123,20 @@ export class AccountsStore {
   setArchived(id, archived) {
     return this.#service.setArchived(id, archived);
   }
+
+  /**
+   * @param {string} id
+   * @returns {Promise<boolean>} whether the account can be deleted (nothing uses it)
+   */
+  async canRemove(id) {
+    return !(await this.#service.isInUse(id));
+  }
+
+  /**
+   * @param {string} id
+   * @returns {Promise<void>}
+   */
+  remove(id) {
+    return this.#service.remove(id);
+  }
 }

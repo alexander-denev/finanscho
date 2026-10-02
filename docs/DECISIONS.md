@@ -426,3 +426,82 @@ reads. Settings → Devices offers a user-confirmed **Remove** (SYNC_PROTOCOL §
   "Inactive" means unseen for 90 days; the stronger warning applies within 7 days.
 - "Clean up server data" (`compactNow`) and the `cleanupBlocked` help (add `DELETE` to the CORS
   methods) live in the same section.
+
+### D42. Deleting accounts: only unused ones, and data wins over the delete
+
+Users asked to delete accounts. Balances are computed from transactions, so deleting an account
+with history would either orphan its transactions or delete them, and deleting transfers would
+change other accounts' balances. Decision (with the user): **only accounts that no transaction
+(either side of a transfer) and no recurring rule (including ended ones) uses can be deleted**;
+anything else is archived. `AccountService.remove` enforces this and throws `InUseError`
+(`accountInUse`); the UI checks first and explains instead of offering the confirm dialog.
+
+- **Concurrent use.** Device A can delete an empty account while device B, offline, records a
+  transaction in it. After every pull, `AccountService.restoreUsed` writes `deleted: false` for
+  each deleted account a visible transaction or rule uses, so the data wins on both devices
+  (both may write the same restore; LWW makes that harmless). Only tombstones that still carry
+  their fields are restored: an account already shrunk to a stub (D40) would stay invisible, and
+  restoring it every cycle would loop.
+- **Archived accounts** move to their own tab on the Accounts page (shown once one exists) and are
+  no longer offered as transaction filters; archiving or deleting the filtered account clears the
+  filter. Users restore an account to filter by it.
+
+### D43. Recurring budgets copied forward, not inherited
+
+A per-budget "Repeat every month" switch (off by default; "Copy last month's budgets" stays for
+budgets that don't repeat). Two designs were considered: a standing per-category limit with
+monthly overrides (one record, but changing it rewrites history and needs an "explicit none"
+marker), and **materialized monthly copies** (chosen), following recurring transactions:
+
+- `BudgetService.materialize` (startup, after pull, local midnight, and after saving a repeating
+  budget) finds each active expense category's newest budget record up to this month **in any
+  state**. If it is visible and `recurring`, it is copied into every later month up to this month.
+  A month with its own budget, a removed budget (tombstone), or a budget switched off ends the
+  chain, so "Remove budget" also stops it repeating. Future months are not filled.
+- **Clocks.** A copy is written with the source record's newest field clock (origin
+  `recurrence`, so older clients accept the ops). Devices copying the same source converge on
+  identical records, a copy of a newer source wins, and a user edit beats every copy. The vault
+  format and op shape are unchanged; the new `recurring` field is absent on older budgets, which
+  means `false`.
+- `latestPerCategory` reads all budget records (including stubs, whose deterministic ID encodes
+  category and month). Budgets are one per category and month, so this stays small.
+
+### D44. Stop/resume keeps the same rule
+
+Bug: stopping a recurring transaction and starting it again "copied" it and created an extra
+transaction. Every edit ended the rule and created a new one, and for a stopped rule the form's
+start date defaulted to today, so the new rule had a new anchor and materialized an occurrence
+today (a duplicate when the old rule had already created today's).
+
+- **Resume in place.** `endDate` is mutable, so `RecurringService.resume` clears it on the same
+  rule, which keeps the ID and the anchor day (a rule on the 31st stays on month ends; a new rule
+  would re-anchor). It continues from the first scheduled date on or after today that is after
+  the old end date. The dates that fell while it was stopped are skipped (user decision): they are
+  written as tombstones (`deleted: true`, no other fields) **before** the `endDate` op in one
+  IndexedDB transaction, so any device that applies the new end date already has them and never
+  materializes them.
+- **Date-only edits in place.** `edit` reopens the same rule when the template and cadence are
+  unchanged and the start date is one of the rule's own dates; skipped dates are handled as
+  above. Other edits still split, and the new rule records `previousRuleId`; the list hides rules
+  that were replaced. Stopped rules move to an "Ended" section with a Resume button.
+- **Existence by key prefix (fix of a latent issue).** `occurrenceIdsForRule` used the
+  `recurringRuleId` index, but tombstone stubs drop that field (D40) and skipped occurrences never
+  have it. With more than 366 such dates, every run filled its catch-up batch with IDs that
+  already existed and never progressed. It now reads primary keys in `[<ruleId>:, <ruleId>:￿]`
+  (rule IDs are UUIDs, so the prefix is exact). A regression test covers 442 pruned skipped dates.
+- **Known limitation.** Two devices resuming or splitting the same rule while both offline still
+  produce two rules, as edits did before.
+
+### D45. Optional categories and payee suggestions
+
+- Income and expenses may be saved **without a category** (faster entry; assign later). A given
+  category must still exist and match the kind. Transfers never have one. The transaction filter
+  gains "Uncategorized" (`TransactionQuery.uncategorized`, transfers excluded); uncategorized
+  spending counts in totals but in no budget.
+- **Payee suggestions** use a native `<datalist>` (no dependency; works offline and on mobile
+  keyboards). `TransactionRepository.recentPayees` walks the date index newest first, reading at
+  most 2000 records, and returns up to 200 distinct payees (case-insensitive) with the kind,
+  category, and account of their latest use. They are loaded when the transaction dialog opens.
+- Picking a known payee fills the category (and its kind) when none is chosen yet, and, for new
+  transactions only, the account unless the user picked one. The payee field moved above the
+  category and account it can fill (user decision).

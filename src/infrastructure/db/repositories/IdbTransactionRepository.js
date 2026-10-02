@@ -32,9 +32,13 @@ function matches(tx, query, needle) {
     return false;
   }
   if (query.categoryId && tx.categoryId !== query.categoryId) return false;
+  if (query.uncategorized && (tx.kind === 'transfer' || tx.categoryId)) return false;
   if (needle && !`${tx.payee}\n${tx.note}`.toLowerCase().includes(needle)) return false;
   return true;
 }
+
+/** How many recent transactions `recentPayees` reads at most, so suggestions stay cheap. */
+export const PAYEE_SCAN_LIMIT = 2000;
 
 /** IndexedDB implementation of the TransactionRepository port. */
 export class IdbTransactionRepository {
@@ -145,6 +149,52 @@ export class IdbTransactionRepository {
   }
 
   /**
+   * @param {string} accountId
+   * @returns {Promise<boolean>}
+   */
+  async hasAnyForAccount(accountId) {
+    const store = this.#db.transaction(STORES.transactions).store;
+    for (const indexName of [TX_INDEXES.accountId, TX_INDEXES.toAccountId]) {
+      let cursor = await store.index(indexName).openCursor(accountId);
+      while (cursor) {
+        if (isVisible(/** @type {StoredRecord} */ (cursor.value))) return true;
+        cursor = await cursor.continue();
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Walks the `[date, createdAt]` index newest first, reading at most PAYEE_SCAN_LIMIT records.
+   * @param {number} limit maximum number of distinct payees
+   * @returns {Promise<import('../../../core/ports/repositories.js').PayeeSuggestion[]>}
+   */
+  async recentPayees(limit) {
+    /** @type {Map<string, import('../../../core/ports/repositories.js').PayeeSuggestion>} */
+    const byKey = new Map();
+    const index = this.#db.transaction(STORES.transactions).store.index(TX_INDEXES.dateCreated);
+    let cursor = await index.openCursor(null, 'prev');
+    for (let read = 0; cursor && read < PAYEE_SCAN_LIMIT && byKey.size < limit; read += 1) {
+      const record = /** @type {StoredRecord} */ (cursor.value);
+      if (isVisible(record)) {
+        /** @type {Transaction} */
+        const tx = toEntity(record);
+        const key = tx.payee.trim().toLocaleLowerCase();
+        if (key && !byKey.has(key)) {
+          byKey.set(key, {
+            payee: tx.payee,
+            kind: tx.kind,
+            categoryId: tx.categoryId,
+            accountId: tx.accountId,
+          });
+        }
+      }
+      cursor = await cursor.continue();
+    }
+    return [...byKey.values()];
+  }
+
+  /**
    * @param {Transaction} transaction
    * @returns {Promise<void>}
    */
@@ -179,14 +229,15 @@ export class IdbTransactionRepository {
   }
 
   /**
+   * Reads the primary keys `<ruleId>:…` rather than the `recurringRuleId` index: tombstone stubs
+   * drop that field (D40), and skipped occurrences never had it.
    * @param {string} ruleId
-   * @returns {Promise<Set<string>>} occurrence IDs in any state, including tombstones
+   * @returns {Promise<Set<string>>} occurrence IDs in any state, including tombstones and stubs
    */
   async occurrenceIdsForRule(ruleId) {
-    const keys = await this.#db.getAllKeysFromIndex(
+    const keys = await this.#db.getAllKeys(
       STORES.transactions,
-      TX_INDEXES.recurringRuleId,
-      ruleId,
+      IDBKeyRange.bound(`${ruleId}:`, `${ruleId}:\uffff`),
     );
     return new Set(keys.map(String));
   }

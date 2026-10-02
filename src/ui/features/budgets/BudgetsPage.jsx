@@ -16,7 +16,8 @@ import styles from './BudgetsPage.module.css';
 /** @typedef {import('./BudgetForm.jsx').BudgetDraft} BudgetDraft */
 
 /**
- * Monthly budgets: month picker, totals, progress per category, and "Copy last month's budgets".
+ * Monthly budgets: month picker, totals, progress per category, and "Copy last month's budgets"
+ * (for budgets that don't repeat; repeating ones are carried forward automatically).
  * @returns {import('preact').JSX.Element}
  */
 export function BudgetsPage() {
@@ -37,7 +38,7 @@ export function BudgetsPage() {
 
   /** @param {BudgetDraft} draft */
   const save = async (draft) => {
-    await budgets.setBudget(draft.categoryId, draft.limit);
+    await budgets.setBudget(draft.categoryId, draft.limit, draft.recurring);
     toasts.show('toast.budgetSaved');
     close();
   };
@@ -148,8 +149,9 @@ export function BudgetsPage() {
                     editingLine.budget.limitMinor,
                     editingLine.budget.currency,
                   ),
+                  recurring: editingLine.budget.recurring === true,
                 }
-              : { categoryId: '', limit: '' }
+              : { categoryId: '', limit: '', recurring: false }
           }
           categories={editingLine ? [editingLine.category] : (data?.unbudgeted ?? [])}
           currency={currency}

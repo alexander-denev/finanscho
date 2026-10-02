@@ -34,7 +34,9 @@ export function TransactionListItem({
   const details = [
     isTransfer
       ? `${accountName} → ${toAccountName}`
-      : [category?.name, accountName].filter(Boolean).join(' · '),
+      : [category?.name ?? t('transactions.uncategorized'), accountName]
+          .filter(Boolean)
+          .join(' · '),
     transaction.note,
   ].filter(Boolean);
 

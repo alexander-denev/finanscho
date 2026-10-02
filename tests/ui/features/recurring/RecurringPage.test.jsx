@@ -22,7 +22,7 @@ describe('RecurringPage', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Add recurring transaction' })[0]);
     const dialog = await screen.findByRole('dialog', { name: 'Add recurring transaction' });
     fireEvent.input(within(dialog).getByLabelText('Amount'), { target: { value: '900' } });
-    fireEvent.change(within(dialog).getByLabelText('Category'), {
+    fireEvent.change(within(dialog).getByLabelText('Category (optional)'), {
       target: { value: 'seed:housing' },
     });
     fireEvent.input(within(dialog).getByLabelText('Payee (optional)'), {
@@ -76,5 +76,21 @@ describe('RecurringPage', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /Tutoring/ }).textContent).toContain('Ended'),
     );
+    expect(screen.getByRole('list', { name: 'Ended' })).toBeTruthy();
+
+    // A stopped rule resumes on its own schedule; it isn't copied.
+    fireEvent.click(screen.getByRole('button', { name: /Tutoring/ }));
+    const stopped = await screen.findByRole('dialog', { name: 'Change recurring transaction' });
+    expect(
+      /** @type {HTMLInputElement} */ (within(stopped).getByLabelText('Start date')).value,
+    ).toBe('2024-05-27');
+    fireEvent.click(within(stopped).getByRole('button', { name: 'Resume' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Tutoring/ }).textContent).toContain(
+        'Next: May 27, 2024',
+      ),
+    );
+    expect(screen.getAllByRole('button', { name: /Tutoring/ })).toHaveLength(1);
+    expect(screen.queryByRole('list', { name: 'Ended' })).toBeNull();
   });
 });

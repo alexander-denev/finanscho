@@ -4,24 +4,34 @@ import { useStores } from '../../context/StoresProvider.jsx';
 import { Amount } from '../../components/Amount.jsx';
 import { BalanceList } from '../../components/BalanceList.jsx';
 import { Button } from '../../components/Button.jsx';
+import { ConfirmDialog } from '../../components/ConfirmDialog.jsx';
 import { Dialog } from '../../components/Dialog.jsx';
 import { EmptyState } from '../../components/EmptyState.jsx';
+import { InlineMessage } from '../../components/InlineMessage.jsx';
 import { PageHeader } from '../../components/PageHeader.jsx';
-import { t } from '../../i18n/i18n.js';
+import { SegmentedControl } from '../../components/SegmentedControl.jsx';
+import { errorMessage, t } from '../../i18n/i18n.js';
 import { AccountForm } from './AccountForm.jsx';
 import styles from './AccountsPage.module.css';
 
 /** @typedef {import('./AccountForm.jsx').AccountDraft} AccountDraft */
 
 /**
- * Accounts with balances; add, edit, archive, and restore.
+ * Accounts with balances; add, edit, archive, restore, and delete unused ones. Archived accounts
+ * live on their own tab, shown once there is one.
  * @returns {import('preact').JSX.Element}
  */
 export function AccountsPage() {
   const { accounts, settings, transactions, router, toasts } = useStores();
   const editing = useSignal(/** @type {{ id: string | null } | null} */ (null));
+  const tab = useSignal(/** @type {'active' | 'archived'} */ ('active'));
+  const confirmDelete = useSignal(false);
+  const deleteBlocked = useSignal(false);
+  const deleteError = useSignal(/** @type {string | null} */ (null));
   const editingId = editing.value?.id ?? null;
   const account = editingId ? accounts.byId.value.get(editingId) : undefined;
+  const archivedItems = accounts.archived.value;
+  const showArchived = tab.value === 'archived' && archivedItems.length > 0;
 
   /** @type {AccountDraft} */
   const initial = account
@@ -42,6 +52,18 @@ export function AccountsPage() {
 
   const close = () => {
     editing.value = null;
+    confirmDelete.value = false;
+    deleteBlocked.value = false;
+    deleteError.value = null;
+  };
+
+  /**
+   * Archived and deleted accounts aren't offered as transaction filters, so drop a filter on one.
+   * @param {string} id
+   */
+  const dropFilterOn = async (id) => {
+    if (transactions.filter.peek().accountId === id)
+      await transactions.setFilter({ accountId: null });
   };
 
   /** @param {AccountDraft} draft */
@@ -56,7 +78,29 @@ export function AccountsPage() {
   const setArchived = async (archived) => {
     if (!editingId) return;
     await accounts.setArchived(editingId, archived);
+    if (archived) await dropFilterOn(editingId);
     toasts.show('toast.accountSaved');
+    close();
+  };
+
+  const askDelete = async () => {
+    if (!editingId) return;
+    deleteError.value = null;
+    if (await accounts.canRemove(editingId)) confirmDelete.value = true;
+    else deleteBlocked.value = true;
+  };
+
+  const remove = async () => {
+    if (!editingId) return;
+    try {
+      await accounts.remove(editingId);
+    } catch (error) {
+      confirmDelete.value = false;
+      deleteError.value = errorMessage(error);
+      return;
+    }
+    await dropFilterOn(editingId);
+    toasts.show('toast.accountDeleted');
     close();
   };
 
@@ -66,6 +110,7 @@ export function AccountsPage() {
     await transactions.setFilter({
       accountId: editingId,
       categoryId: null,
+      uncategorized: false,
       month: null,
       search: '',
     });
@@ -112,36 +157,60 @@ export function AccountsPage() {
         />
       ) : (
         <>
-          <div className={styles.totals}>
-            {accounts.totals.value.map((total) => (
-              <Amount
-                key={total.currency}
-                minor={total.amountMinor}
-                currency={total.currency}
-                kind="signed"
-                size="xl"
+          {archivedItems.length > 0 && (
+            <div className={styles.tabs}>
+              <SegmentedControl
+                legend={t('accounts.show')}
+                value={showArchived ? 'archived' : 'active'}
+                options={[
+                  {
+                    value: 'active',
+                    label: t('accounts.tab.active', { count: accounts.active.value.length }),
+                  },
+                  {
+                    value: 'archived',
+                    label: t('accounts.tab.archived', { count: archivedItems.length }),
+                  },
+                ]}
+                onChange={(value) => {
+                  tab.value = value === 'archived' ? 'archived' : 'active';
+                }}
               />
-            ))}
-          </div>
-          <BalanceList
-            items={toItems(accounts.active.value)}
-            onSelect={openEditor}
-            label={t('accounts.title')}
-          />
-          {accounts.archived.value.length > 0 && (
-            <section className={styles.archived}>
-              <h2 className={styles.sectionTitle}>{t('accounts.archivedSection')}</h2>
+            </div>
+          )}
+          {showArchived ? (
+            <>
+              <p className={styles.intro}>{t('accounts.archivedIntro')}</p>
               <BalanceList
-                items={toItems(accounts.archived.value)}
+                items={toItems(archivedItems)}
                 onSelect={openEditor}
                 label={t('accounts.archivedSection')}
               />
-            </section>
+            </>
+          ) : (
+            <>
+              <div className={styles.totals}>
+                {accounts.totals.value.map((total) => (
+                  <Amount
+                    key={total.currency}
+                    minor={total.amountMinor}
+                    currency={total.currency}
+                    kind="signed"
+                    size="xl"
+                  />
+                ))}
+              </div>
+              <BalanceList
+                items={toItems(accounts.active.value)}
+                onSelect={openEditor}
+                label={t('accounts.title')}
+              />
+            </>
           )}
         </>
       )}
       <Dialog
-        open={editing.value !== null}
+        open={editing.value !== null && !confirmDelete.value}
         title={editingId ? t('accounts.edit') : t('accounts.add')}
         onClose={close}
       >
@@ -153,20 +222,46 @@ export function AccountsPage() {
           extraActions={
             account && (
               <>
-                <Button variant="ghost" onClick={() => void viewTransactions()}>
-                  {t('accounts.viewTransactions')}
-                </Button>
+                {!account.archived && (
+                  <Button variant="ghost" onClick={() => void viewTransactions()}>
+                    {t('accounts.viewTransactions')}
+                  </Button>
+                )}
                 <Button variant="danger" onClick={() => void setArchived(!account.archived)}>
                   {account.archived ? t('common.unarchive') : t('common.archive')}
+                </Button>
+                <Button variant="danger" icon="trash" onClick={() => void askDelete()}>
+                  {t('common.delete')}
                 </Button>
               </>
             )
           }
         />
+        {deleteBlocked.value && (
+          <div className={styles.message}>
+            <InlineMessage tone="error">{t('accounts.deleteBlocked')}</InlineMessage>
+          </div>
+        )}
+        {deleteError.value && (
+          <div className={styles.message}>
+            <InlineMessage tone="error">{deleteError.value}</InlineMessage>
+          </div>
+        )}
         {account && !account.archived && (
           <p className={styles.note}>{t('accounts.archiveConfirm')}</p>
         )}
       </Dialog>
+      <ConfirmDialog
+        open={editing.value !== null && confirmDelete.value}
+        title={t('accounts.delete')}
+        message={t('accounts.deleteConfirm', { name: account?.name ?? '' })}
+        confirmLabel={t('accounts.delete')}
+        danger
+        onConfirm={() => void remove()}
+        onCancel={() => {
+          confirmDelete.value = false;
+        }}
+      />
     </>
   );
 }

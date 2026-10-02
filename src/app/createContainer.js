@@ -112,6 +112,7 @@ export async function createContainer({ window, registerServiceWorker }) {
   await recorder.pruneTombstones(clock.nowMs());
   await categoryService.seedDefaults();
   await recurringService.materialize();
+  await budgetService.materialize();
 
   // Sync over fetch; the WebDAV server must allow CORS (see docs/SYNC_PROTOCOL.md §8).
   const http = new FetchHttpAdapter();
@@ -133,7 +134,9 @@ export async function createContainer({ window, registerServiceWorker }) {
         deviceId,
         getDeviceName: () => device.getDeviceName(),
         afterPull: async () => {
+          await accountService.restoreUsed();
           await recurringService.materialize();
+          await budgetService.materialize();
         },
         changeFeed,
         nowIso: () => clock.nowIso(),
@@ -189,6 +192,7 @@ export async function createContainer({ window, registerServiceWorker }) {
 
   const cancelMidnight = onLocalMidnight(() => {
     void stores.recurring.materialize();
+    void stores.budgets.materialize();
     void stores.budgets.invalidate();
     void stores.dashboard.invalidate();
   });

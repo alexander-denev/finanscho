@@ -1,3 +1,4 @@
+import { Icon } from '../../components/Icon.jsx';
 import { ProgressBar } from '../../components/ProgressBar.jsx';
 import { Swatch } from '../../components/Swatch.jsx';
 import { formatMoney, formatPercent, t } from '../../i18n/i18n.js';
@@ -25,6 +26,11 @@ export function BudgetRow({ line, onSelect }) {
         <span className={styles.name}>
           <Swatch color={category.color} />
           {category.name}
+          {budget.recurring && (
+            <span className={styles.repeats}>
+              <Icon name="repeat" label={t('budgets.repeats')} />
+            </span>
+          )}
         </span>
         <span className={styles.figures}>
           {t('budgets.spentOf', {

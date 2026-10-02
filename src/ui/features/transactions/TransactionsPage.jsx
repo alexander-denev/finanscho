@@ -22,7 +22,9 @@ export function TransactionsPage() {
   const categoryById = categories.byId.value;
   const filter = transactions.filter.value;
   const days = transactions.days.value;
-  const filtered = Boolean(filter.accountId || filter.categoryId || filter.month || filter.search);
+  const filtered = Boolean(
+    filter.accountId || filter.categoryId || filter.uncategorized || filter.month || filter.search,
+  );
 
   /** @param {string | null} id */
   const openDialog = (id) => {
@@ -43,7 +45,7 @@ export function TransactionsPage() {
         filter={filter}
         onChange={(changes) => void transactions.setFilter(changes)}
         onClear={() => void transactions.clearFilter()}
-        accounts={accounts.items.value.map(({ account }) => account)}
+        accounts={accounts.active.value.map(({ account }) => account)}
         categories={categories.all.value}
         today={clock.today()}
       />

@@ -15,7 +15,8 @@ const PATHS = /** @type {const} */ ({
   tag: 'M3 12V3h9l9 9-9 9zM7.5 7.5h.01',
   settings:
     'M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1',
-  more: 'M5 12h.01M12 12h.01M19 12h.01',
+  // Dots drawn as small circles: zero-length segments render as near-invisible 1.8 px specks.
+  more: 'M5 10.8a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 1 0 0-2.4zM12 10.8a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 1 0 0-2.4zM19 10.8a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 1 0 0-2.4z',
   transfer: 'M4 12h16M14 6l6 6-6 6',
   trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13',
   edit: 'M4 20h4L20 8l-4-4L4 16z',

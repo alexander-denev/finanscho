@@ -116,6 +116,8 @@ export const EN = Object.freeze({
     'That file isn’t a Finanscho backup. Choose a file exported from Finanscho.',
   'errors.backupFormatTooNew':
     'This backup comes from a newer version of Finanscho. Update the app, then import it.',
+  'errors.accountInUse':
+    'This account has transactions or recurring transactions, so it can’t be deleted. Archive it instead.',
   'errors.unknown': 'Something went wrong. Try again.',
   'errors.load': 'Couldn’t load this data. Try again.',
 
@@ -149,6 +151,7 @@ export const EN = Object.freeze({
   'toast.transactionSaved': 'Transaction saved.',
   'toast.transactionDeleted': 'Transaction deleted.',
   'toast.accountSaved': 'Account saved.',
+  'toast.accountDeleted': 'Account deleted.',
   'toast.categorySaved': 'Category saved.',
   'toast.budgetSaved': 'Budget saved.',
   'toast.budgetRemoved': 'Budget removed.',
@@ -156,6 +159,7 @@ export const EN = Object.freeze({
   'toast.nothingToCopy': 'Nothing to copy. Last month has no budgets that aren’t already set.',
   'toast.ruleSaved': 'Recurring transaction saved.',
   'toast.ruleStopped': 'Recurring transaction stopped.',
+  'toast.ruleResumed': 'Recurring transaction resumed. Next: {date}.',
   'toast.ruleDeleted': 'Recurring transaction deleted.',
   'toast.settingsSaved': 'Settings saved.',
   'toast.syncSaved': 'Sync settings saved. Syncing now.',
@@ -200,7 +204,16 @@ export const EN = Object.freeze({
   'accounts.balance': 'Balance',
   'accounts.archivedSection': 'Archived accounts',
   'accounts.archiveConfirm':
-    'Archived accounts are hidden from lists and totals. Their transactions stay.',
+    'Archived accounts move to the Archived tab and are left out of totals, pickers, and filters. Their transactions stay.',
+  'accounts.show': 'Show',
+  'accounts.tab.active': 'Active ({count})',
+  'accounts.tab.archived': 'Archived ({count})',
+  'accounts.archivedIntro':
+    'Archived accounts keep their transactions. Restore one to use it, or to filter transactions by it.',
+  'accounts.delete': 'Delete account',
+  'accounts.deleteConfirm': 'Delete {name}? This can’t be undone.',
+  'accounts.deleteBlocked':
+    'This account has transactions or recurring transactions, so it can’t be deleted. Archive it instead.',
   'accounts.empty.title': 'No accounts yet',
   'accounts.empty.body': 'Add an account to start tracking money in and out.',
   'accounts.viewTransactions': 'View transactions',
@@ -241,6 +254,7 @@ export const EN = Object.freeze({
   'transactions.search': 'Search payee or note',
   'transactions.allAccounts': 'All accounts',
   'transactions.allCategories': 'All categories',
+  'transactions.uncategorized': 'Uncategorized',
   'transactions.allMonths': 'All months',
   'transactions.clearFilters': 'Clear filters',
   'transactions.total': 'Net of shown transactions',
@@ -262,6 +276,10 @@ export const EN = Object.freeze({
   'budgets.remove': 'Remove budget',
   'budgets.category': 'Category',
   'budgets.limit': 'Monthly limit',
+  'budgets.recurring': 'Repeat every month',
+  'budgets.recurringHint':
+    'Carried into each new month until you turn this off or remove the budget. Changing the limit later applies from that month on.',
+  'budgets.repeats': 'Repeats every month',
   'budgets.spentOf': '{spent} of {limit}',
   'budgets.left': '{amount} left',
   'budgets.over': '{amount} over',
@@ -281,6 +299,8 @@ export const EN = Object.freeze({
   'recurring.save': 'Save recurring transaction',
   'recurring.editExplainer':
     'Changes apply from the start date you choose. Earlier transactions stay as they are.',
+  'recurring.resumeExplainer':
+    'Resume continues on the same schedule from today. Dates missed while it was stopped are skipped.',
   'recurring.frequency': 'Repeats',
   'recurring.interval': 'Every',
   'recurring.intervalUnit.daily': 'days',
@@ -291,7 +311,9 @@ export const EN = Object.freeze({
   'recurring.endDate': 'End date',
   'recurring.next': 'Next: {date}',
   'recurring.ended': 'Ended',
+  'recurring.endedSection': 'Ended',
   'recurring.stop': 'Stop',
+  'recurring.resume': 'Resume',
   'recurring.stopConfirm':
     'Stop this recurring transaction after today? Transactions already created stay.',
   'recurring.deleteConfirm':

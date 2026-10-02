@@ -31,6 +31,11 @@
   font-weight: var(--fw-strong);
 }
 
+.repeats {
+  display: inline-flex;
+  color: var(--c-muted);
+}
+
 .figures,
 .remaining {
   font-variant-numeric: tabular-nums;

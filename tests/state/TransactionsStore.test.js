@@ -83,6 +83,7 @@ describe('TransactionsStore', () => {
     expect(t.stores.transactions.filter.value).toEqual({
       accountId: null,
       categoryId: null,
+      uncategorized: false,
       month: null,
       search: '',
     });

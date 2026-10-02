@@ -61,15 +61,25 @@ describe('transaction', () => {
     });
   });
 
-  it('requires an existing account and category', () => {
+  it('requires an existing account and, when one is given, an existing category', () => {
     expect(
       fieldErrors(() =>
         normalizeTransactionInput(
-          { kind: 'expense', date: '2024-02-03', amount: '1', accountId: 'x', categoryId: '' },
+          { kind: 'expense', date: '2024-02-03', amount: '1', accountId: 'x', categoryId: 'gone' },
           { account: null, toAccount: null, category: null },
         ),
       ),
     ).toEqual({ accountId: 'validation.required', categoryId: 'validation.required' });
+  });
+
+  it('allows income and expenses without a category', () => {
+    for (const categoryId of ['', null, undefined]) {
+      const fields = normalizeTransactionInput(
+        { kind: 'expense', date: '2024-02-03', amount: '1', accountId: 'a1', categoryId },
+        { account: eur, toAccount: null, category: null },
+      );
+      expect(fields.categoryId).toBeNull();
+    }
   });
 
   it('validates transfers', () => {

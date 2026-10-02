@@ -38,6 +38,26 @@ describe('BudgetsPage', () => {
     expect(screen.getAllByText('Close to the limit').length).toBeGreaterThan(0);
   });
 
+  it('sets a budget that repeats every month', async () => {
+    const ui = await createUiStores({ path: '/budgets' });
+    renderWithStores(<BudgetsPage />, ui.stores);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Set a budget' })[0]);
+    const dialog = await screen.findByRole('dialog', { name: 'Set a budget' });
+    fireEvent.change(within(dialog).getByLabelText('Category'), {
+      target: { value: 'seed:dining' },
+    });
+    fireEvent.input(within(dialog).getByLabelText('Monthly limit'), { target: { value: '80' } });
+    const repeat = /** @type {HTMLInputElement} */ (
+      within(dialog).getByRole('switch', { name: 'Repeat every month' })
+    );
+    expect(repeat.checked).toBe(false);
+    fireEvent.click(repeat);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save budget' }));
+    expect(await screen.findByRole('img', { name: 'Repeats every month' })).toBeTruthy();
+    await ui.settled();
+    expect(ui.stores.budgets.data.value?.lines[0].budget.recurring).toBe(true);
+  });
+
   it("copies last month's budgets into the next month", async () => {
     const ui = await createUiStores({ path: '/budgets' });
     await ui.stores.budgets.setBudget('seed:dining', '80');

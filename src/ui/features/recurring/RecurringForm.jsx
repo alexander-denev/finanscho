@@ -21,7 +21,8 @@ import styles from './RecurringForm.module.css';
 /**
  * @typedef {object} RecurringFormProps
  * @property {RecurringDraft} initial
- * @property {boolean} isEdit shows the explanation that edits start a new rule
+ * @property {boolean} isEdit shows the explanation that edits apply from the start date
+ * @property {boolean} [stopped] the rule has ended; explains resuming instead
  * @property {readonly { id: string, name: string, currency: string }[]} accounts
  * @property {readonly { id: string, name: string, kind: string }[]} categories
  * @property {(draft: RecurringDraft) => Promise<void>} onSubmit
@@ -37,6 +38,7 @@ import styles from './RecurringForm.module.css';
 export function RecurringForm({
   initial,
   isEdit,
+  stopped = false,
   accounts,
   categories,
   onSubmit,
@@ -59,7 +61,11 @@ export function RecurringForm({
 
   return (
     <form className={styles.form} onSubmit={handleSubmit} noValidate>
-      {isEdit && <InlineMessage>{t('recurring.editExplainer')}</InlineMessage>}
+      {isEdit && (
+        <InlineMessage>
+          {t(stopped ? 'recurring.resumeExplainer' : 'recurring.editExplainer')}
+        </InlineMessage>
+      )}
       <TransactionFields
         value={draft}
         onChange={form.update}

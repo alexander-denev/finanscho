@@ -7,7 +7,7 @@ import { Dialog } from '../../components/Dialog.jsx';
 import { EmptyState } from '../../components/EmptyState.jsx';
 import { PageHeader } from '../../components/PageHeader.jsx';
 import { UpcomingList } from '../../components/UpcomingList.jsx';
-import { t } from '../../i18n/i18n.js';
+import { formatDate, t } from '../../i18n/i18n.js';
 import { RecurringForm } from './RecurringForm.jsx';
 import { RuleRow } from './RuleRow.jsx';
 import styles from './RecurringPage.module.css';
@@ -39,7 +39,8 @@ function toInput(draft) {
 }
 
 /**
- * Recurring rules, their next dates, and everything due in the next 30 days.
+ * Recurring rules, their next dates, everything due in the next 30 days, and stopped rules (which
+ * can be resumed).
  * @returns {import('preact').JSX.Element}
  */
 export function RecurringPage() {
@@ -49,7 +50,10 @@ export function RecurringPage() {
   const accountById = accounts.byId.value;
   const categoryById = categories.byId.value;
   const summaries = recurring.rules.value;
+  const running = summaries.filter((s) => s.nextDate !== null);
+  const ended = summaries.filter((s) => s.nextDate === null);
   const editingSummary = summaries.find((s) => s.rule.id === editing.value?.ruleId);
+  const editingEnded = editingSummary !== undefined && editingSummary.nextDate === null;
   const activeAccounts = accounts.active.value.map(({ account }) => account);
 
   /**
@@ -74,8 +78,9 @@ export function RecurringPage() {
         date: '',
         frequency: editingSummary.rule.frequency,
         interval: String(editingSummary.rule.interval),
-        startDate: editingSummary.nextDate ?? clock.today(),
-        endDate: editingSummary.rule.endDate ?? '',
+        // A stopped rule restarts on its own schedule, not on an arbitrary day.
+        startDate: editingSummary.nextDate ?? editingSummary.resumeDate ?? clock.today(),
+        endDate: editingEnded ? '' : (editingSummary.rule.endDate ?? ''),
       }
     : {
         kind: 'expense',
@@ -109,6 +114,39 @@ export function RecurringPage() {
     toasts.show('toast.ruleSaved');
     close();
   };
+
+  const resume = async () => {
+    const ruleId = editing.value?.ruleId;
+    if (!ruleId) return;
+    const next = await recurring.resume(ruleId);
+    toasts.show('toast.ruleResumed', { date: formatDate(next, 'medium') });
+    close();
+  };
+
+  /**
+   * @param {import('../../../core/services/RecurringService.js').RuleSummary[]} list
+   * @param {string} label
+   * @returns {import('preact').JSX.Element}
+   */
+  const ruleList = (list, label) => (
+    <ul className={styles.list} aria-label={label}>
+      {list.map((summary) => {
+        const template = summary.rule.template;
+        const category = template.categoryId ? categoryById.get(template.categoryId) : undefined;
+        return (
+          <li key={summary.rule.id}>
+            <RuleRow
+              summary={summary}
+              title={titleOf(template)}
+              color={category?.color ?? null}
+              currency={accountById.get(template.accountId)?.currency ?? 'EUR'}
+              onSelect={open}
+            />
+          </li>
+        );
+      })}
+    </ul>
+  );
 
   const runConfirmed = async () => {
     const ruleId = editing.value?.ruleId;
@@ -151,29 +189,17 @@ export function RecurringPage() {
         />
       ) : (
         <>
-          <ul className={styles.list}>
-            {summaries.map((summary) => {
-              const template = summary.rule.template;
-              const category = template.categoryId
-                ? categoryById.get(template.categoryId)
-                : undefined;
-              return (
-                <li key={summary.rule.id}>
-                  <RuleRow
-                    summary={summary}
-                    title={titleOf(template)}
-                    color={category?.color ?? null}
-                    currency={accountById.get(template.accountId)?.currency ?? 'EUR'}
-                    onSelect={open}
-                  />
-                </li>
-              );
-            })}
-          </ul>
+          {running.length > 0 && ruleList(running, t('recurring.title'))}
           <section className={styles.upcoming}>
             <h2 className={styles.sectionTitle}>{t('recurring.upcoming')}</h2>
             <UpcomingList items={upcoming} emptyText={t('dashboard.noUpcoming')} />
           </section>
+          {ended.length > 0 && (
+            <section className={styles.upcoming}>
+              <h2 className={styles.sectionTitle}>{t('recurring.endedSection')}</h2>
+              {ruleList(ended, t('recurring.endedSection'))}
+            </section>
+          )}
         </>
       )}
       <Dialog
@@ -184,6 +210,7 @@ export function RecurringPage() {
         <RecurringForm
           initial={initial}
           isEdit={Boolean(editingSummary)}
+          stopped={editingEnded}
           accounts={activeAccounts}
           categories={categories.active.value}
           onSubmit={save}
@@ -191,7 +218,11 @@ export function RecurringPage() {
           extraActions={
             editingSummary && (
               <>
-                {editingSummary.nextDate && (
+                {editingEnded ? (
+                  <Button icon="repeat" onClick={() => void resume()}>
+                    {t('recurring.resume')}
+                  </Button>
+                ) : (
                   <Button variant="danger" onClick={() => (confirm.value = 'stop')}>
                     {t('recurring.stop')}
                   </Button>

@@ -18,7 +18,8 @@ export const TRANSACTION_KINDS = /** @type {const} */ (['expense', 'income', 'tr
 
 /**
  * A transaction. `amountMinor` is always positive; its sign is derived from `kind`.
- * Transfers move money from `accountId` to `toAccountId` and have no category.
+ * Transfers move money from `accountId` to `toAccountId` and have no category. Income and
+ * expenses may be uncategorized (`categoryId` null) until the user assigns one.
  * @typedef {BaseEntity & {
  *   kind: TransactionKind,
  *   date: LocalDate,
@@ -84,8 +85,9 @@ export function normalizeTransactionInput(input, refs, options = {}) {
 
   /** @type {string | null} */
   let categoryError = null;
-  if (!isTransfer) {
-    if (!input.categoryId || refs.category === null) categoryError = 'validation.required';
+  // The category is optional (it can be assigned later), but a given one must exist and match.
+  if (!isTransfer && input.categoryId) {
+    if (refs.category === null) categoryError = 'validation.required';
     else if (refs.category.kind !== kind) categoryError = 'validation.categoryKind';
   }
 
@@ -120,7 +122,7 @@ export function normalizeTransactionInput(input, refs, options = {}) {
     amountMinor: amount.ok ? amount.minor : 0,
     accountId: input.accountId,
     toAccountId: isTransfer ? (input.toAccountId ?? null) : null,
-    categoryId: isTransfer ? null : (input.categoryId ?? null),
+    categoryId: isTransfer ? null : input.categoryId || null,
     payee: cleanText(input.payee),
     note: cleanText(input.note),
   };

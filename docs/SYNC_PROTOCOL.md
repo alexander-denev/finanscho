@@ -86,7 +86,8 @@ between devices. Rules:
   Ops for unknown entities are skipped (kept on the server for newer clients).
 - `fields`: the field values written. A create contains every field; an edit contains only the
   changed fields plus `updatedAt`. A delete is `{ "deleted": true, "updatedAt": … }`.
-- `origin`: `"user"` or `"recurrence"` (occurrences materialized from a recurring rule).
+- `origin`: `"user"` or `"recurrence"` (occurrences materialized from a recurring rule, and
+  recurring budgets copied into a new month).
 - Unknown fields inside `fields` are stored as-is, so older clients never destroy newer data.
 
 ## 2. Merge
@@ -117,18 +118,32 @@ wins locally.
 Records that two devices can create independently before syncing use deterministic IDs so they
 merge into one record instead of duplicating:
 
-| Record               | ID                       | Clock used for its fields |
-| -------------------- | ------------------------ | ------------------------- |
-| Seeded category      | `seed:<slug>`            | `SEED_HLC` (minimum)      |
-| Budget               | `<categoryId>:<YYYY-MM>` | normal local HLC          |
-| Recurring occurrence | `<ruleId>:<YYYY-MM-DD>`  | the rule's creation clock |
+| Record                   | ID                       | Clock used for its fields               |
+| ------------------------ | ------------------------ | --------------------------------------- |
+| Seeded category          | `seed:<slug>`            | `SEED_HLC` (minimum)                    |
+| Budget                   | `<categoryId>:<YYYY-MM>` | normal local HLC                        |
+| Recurring budget copy    | `<categoryId>:<YYYY-MM>` | the source budget's newest field clock  |
+| Recurring occurrence     | `<ruleId>:<YYYY-MM-DD>`  | the rule's creation clock               |
+| Skipped occurrence (D44) | `<ruleId>:<YYYY-MM-DD>`  | normal local HLC (a tombstone, no data) |
 
 Recurring occurrences are built entirely from the immutable rule (including `createdAt` and
 `updatedAt`, which equal the rule's `createdAt`) and are written with the rule's creation clock
 (`rule._clocks.createdAt`). Two devices materializing the same occurrence therefore produce
 byte-identical fields and clocks, and any later user edit or deletion (with a newer HLC) wins.
 Materialization never writes an occurrence whose ID already exists locally, in any state
-(including deleted), so deleting an occurrence is permanent.
+(including deleted), so deleting an occurrence is permanent. Existing IDs are found by the key
+prefix `<ruleId>:`, so tombstone stubs (which drop `recurringRuleId`) still count.
+
+Resuming a stopped rule, or moving its dates without changing its transaction, clears or moves
+its `endDate` in place (D44). The occurrence dates that fell while it was stopped are first
+written as tombstones (`deleted: true`, no other fields) in the same IndexedDB transaction, before
+the `endDate` op, so every device that sees the new end date has already seen them.
+
+A recurring budget (`recurring: true`) is copied into each later month up to the current one,
+unless that month already has a record in any state (D43). A copy holds the source's fields with
+the new month and is written with the source's newest field clock, with origin `"recurrence"`.
+Devices copying the same source write identical records; a copy of a newer source wins; a user
+edit (a fresh clock) beats every copy.
 
 ## 4. Local write path
 
@@ -220,7 +235,9 @@ request during a running cycle is coalesced into one follow-up cycle.
    `seq > cursor` and set the cursor to the segment's last seq.
 4. A malformed head or segment is skipped and reported (`malformed`) without crashing; the cursor
    does not move past it, so it is retried next cycle. Other devices still sync.
-5. After pulling, run recurring materialization, then publish `{ entities, source: 'remote' }`.
+5. After pulling, restore deleted accounts that a transaction or rule uses again (D42), run
+   recurring materialization (transactions, then budgets), then publish
+   `{ entities, source: 'remote' }`.
 
 ### 6.3 Push
 
@@ -292,8 +309,8 @@ When WebDAV is configured, a cycle runs on app start; on resume (`visibilitychan
 in the foreground; and on "Sync now". Transient failures (offline, network, 5xx) back off
 exponentially (5 s, 10 s, 20 s … capped at 5 minutes). Auth, format, and configuration errors
 get no backoff retries; the regular triggers (resume, the 5-minute interval, "Sync now", and
-changing the settings) still try again. Recurring materialization also runs at local midnight while
-the app is open.
+changing the settings) still try again. Recurring materialization (transactions and budgets) also
+runs at local midnight while the app is open.
 
 ## 10. Compaction
 

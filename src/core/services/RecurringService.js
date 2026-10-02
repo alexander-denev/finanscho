@@ -4,9 +4,13 @@ import {
   buildOccurrence,
   createRecurringRule,
   endDateForEdit,
+  isOnSchedule,
   MATERIALIZE_CAP,
   normalizeRuleInput,
   occurrenceId,
+  resumeDate,
+  sameRecurrence,
+  skippedDates,
 } from '../domain/recurringRule.js';
 import { NotFoundError } from '../errors.js';
 
@@ -30,7 +34,11 @@ export const UPCOMING_DAYS = 30;
  * @property {RuleTemplate} template
  */
 
-/** @typedef {{ rule: RecurringRule, nextDate: string | null }} RuleSummary */
+/**
+ * A rule as listed: `nextDate` is its next occurrence after today (null once it has ended), and
+ * `resumeDate` is where it would pick up again if resumed (null while it hasn't ended).
+ * @typedef {{ rule: RecurringRule, nextDate: string | null, resumeDate: string | null }} RuleSummary
+ */
 
 /** Use cases for recurring rules and their occurrences. */
 export class RecurringService {
@@ -54,16 +62,21 @@ export class RecurringService {
   }
 
   /**
-   * Rules with their next occurrence after today (null when the rule has ended).
+   * Rules with their next occurrence after today (null when the rule has ended). Rules replaced
+   * by an edit are left out: the replacement stands for them.
    * @returns {Promise<RuleSummary[]>}
    */
   async list() {
-    const tomorrow = addDays(this.#clock.today(), 1);
+    const today = this.#clock.today();
+    const tomorrow = addDays(today, 1);
     const rules = await this.#rules.list();
-    return rules.map((rule) => ({
-      rule,
-      nextDate: occurrencesBetween(rule, tomorrow, '9999-12-31', 1)[0] ?? null,
-    }));
+    const replaced = new Set(rules.map((r) => r.previousRuleId).filter(Boolean));
+    return rules
+      .filter((rule) => !replaced.has(rule.id))
+      .map((rule) => {
+        const nextDate = occurrencesBetween(rule, tomorrow, '9999-12-31', 1)[0] ?? null;
+        return { rule, nextDate, resumeDate: nextDate ? null : resumeDate(rule, today) };
+      });
   }
 
   /**
@@ -79,16 +92,21 @@ export class RecurringService {
 
   /**
    * @param {RecurringRuleInput} input
+   * @param {string | null} [previousRuleId]
    * @returns {Promise<RecurringRule>}
    */
-  async #build(input) {
+  async #build(input, previousRuleId = null) {
     const [account, toAccount, category] = await Promise.all([
       input.template.accountId ? this.#accounts.get(input.template.accountId) : null,
       input.template.toAccountId ? this.#accounts.get(input.template.toAccountId) : null,
       input.template.categoryId ? this.#categories.get(input.template.categoryId) : null,
     ]);
     const fields = normalizeRuleInput(input, { account, toAccount, category });
-    return createRecurringRule(fields, { id: this.#ids.newId(), now: this.#clock.nowIso() });
+    return createRecurringRule(
+      fields,
+      { id: this.#ids.newId(), now: this.#clock.nowIso() },
+      previousRuleId,
+    );
   }
 
   /**
@@ -104,15 +122,21 @@ export class RecurringService {
   }
 
   /**
-   * "Edits" an immutable rule: ends the old rule the day before the new start date and creates a
-   * new rule from the input. The new rule is validated before the old one is touched.
+   * "Edits" an immutable rule. When only the dates change (same transaction and cadence, and the
+   * start date is one of the rule's own dates), the rule is reopened in place, keeping its ID and
+   * anchor day. Otherwise the old rule ends the day before the new start date and a new rule,
+   * linked back to it, is created. The input is validated before anything is written.
    * @param {string} ruleId
    * @param {RecurringRuleInput} input the new rule; its start date is the effective date
-   * @returns {Promise<RecurringRule>} the new rule
+   * @returns {Promise<RecurringRule>} the edited or the new rule
    */
   async edit(ruleId, input) {
     const old = await this.get(ruleId);
-    const replacement = await this.#build(input);
+    const replacement = await this.#build(input, ruleId);
+    if (sameRecurrence(old, replacement) && isOnSchedule(old, replacement.startDate)) {
+      await this.#reopen(old, replacement.startDate, replacement.endDate);
+      return this.get(ruleId);
+    }
     await this.#rules.setEndDate(
       ruleId,
       endDateForEdit(old, replacement.startDate),
@@ -135,6 +159,34 @@ export class RecurringService {
       endDateForEdit(rule, addDays(this.#clock.today(), 1)),
       this.#clock.nowIso(),
     );
+  }
+
+  /**
+   * Resumes a stopped rule on its own schedule from today: the dates it missed while stopped are
+   * skipped for good, and nothing it already created is created again.
+   * @param {string} ruleId
+   * @returns {Promise<string>} the date of the next occurrence (may be today)
+   */
+  async resume(ruleId) {
+    const rule = await this.get(ruleId);
+    const from = resumeDate(rule, this.#clock.today());
+    await this.#reopen(rule, from, null);
+    return from;
+  }
+
+  /**
+   * Continues a rule from `effectiveDate` with a new end date: occurrence dates after its old end
+   * and before `effectiveDate` are recorded as skipped, then due occurrences are created.
+   * @param {RecurringRule} rule
+   * @param {string} effectiveDate one of the rule's occurrence dates
+   * @param {string | null} endDate
+   * @returns {Promise<void>}
+   */
+  async #reopen(rule, effectiveDate, endDate) {
+    const skipped = skippedDates(rule, effectiveDate).map((date) => occurrenceId(rule.id, date));
+    if (skipped.length === 0 && endDate === rule.endDate) return;
+    await this.#rules.reopen(rule.id, endDate, skipped, this.#clock.nowIso());
+    await this.#materializeRule({ ...rule, endDate }, this.#clock.today());
   }
 
   /**

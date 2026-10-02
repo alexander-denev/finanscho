@@ -41,7 +41,7 @@ describe('RecurringStore and DashboardStore', () => {
     expect(recurring.rules.value).toEqual([]);
   });
 
-  it('replaces a rule on edit', async () => {
+  it('edits dates in place and replaces a rule whose transaction changes', async () => {
     const t = await createTestStores();
     const main = await t.stores.accounts.create({
       name: 'Main',
@@ -62,8 +62,16 @@ describe('RecurringStore and DashboardStore', () => {
       },
     };
     const rule = await t.stores.recurring.create(input);
-    const next = await t.stores.recurring.edit(rule.id, { ...input, startDate: '2024-07-01' });
+    const same = await t.stores.recurring.edit(rule.id, { ...input, startDate: '2024-07-01' });
+    expect(same.id).toBe(rule.id);
+    const next = await t.stores.recurring.edit(rule.id, {
+      ...input,
+      startDate: '2024-07-01',
+      template: { ...input.template, amount: '20' },
+    });
     await t.settled();
-    expect(t.stores.recurring.rules.value.map((r) => r.rule.id)).toEqual([rule.id, next.id]);
+    expect(next.previousRuleId).toBe(rule.id);
+    // The replaced rule is left out of the list; the replacement stands for it.
+    expect(t.stores.recurring.rules.value.map((r) => r.rule.id)).toEqual([next.id]);
   });
 });

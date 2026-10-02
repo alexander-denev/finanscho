@@ -5,14 +5,18 @@
   margin-bottom: var(--sp-5);
 }
 
-.archived {
-  margin-top: var(--sp-6);
+.tabs {
+  margin-bottom: var(--sp-5);
 }
 
-.sectionTitle {
-  margin-bottom: var(--sp-2);
-  font-size: var(--fs-lg);
+.intro {
+  margin-bottom: var(--sp-4);
   color: var(--c-muted);
+  font-size: var(--fs-sm);
+}
+
+.message {
+  margin-top: var(--sp-4);
 }
 
 .note {

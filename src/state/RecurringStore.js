@@ -78,7 +78,8 @@ export class RecurringStore {
   }
 
   /**
-   * Replaces a rule from the input's start date on (the old rule ends the day before).
+   * Changes a rule from the input's start date on: in place when only its dates change, else by
+   * replacing it (the old rule ends the day before).
    * @param {string} ruleId
    * @param {RecurringRuleInput} input
    * @returns {Promise<RecurringRule>}
@@ -93,6 +94,14 @@ export class RecurringStore {
    */
   stop(ruleId) {
     return this.#service.stop(ruleId);
+  }
+
+  /**
+   * @param {string} ruleId
+   * @returns {Promise<string>} the next occurrence date
+   */
+  resume(ruleId) {
+    return this.#service.resume(ruleId);
   }
 
   /**

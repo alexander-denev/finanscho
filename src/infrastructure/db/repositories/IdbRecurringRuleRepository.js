@@ -55,6 +55,29 @@ export class IdbRecurringRuleRepository {
   }
 
   /**
+   * The skipped occurrences are written first, so any device that applies the new end date has
+   * already applied them (ops are applied in outbox order) and never materializes them.
+   * @param {string} id
+   * @param {string | null} endDate
+   * @param {string[]} skippedOccurrenceIds
+   * @param {string} updatedAt
+   * @returns {Promise<void>}
+   */
+  async reopen(id, endDate, skippedOccurrenceIds, updatedAt) {
+    await this.#recorder.transact(['transactions', 'recurringRules'], async (ctx) => {
+      for (const occurrenceId of skippedOccurrenceIds) {
+        if (await ctx.get('transactions', occurrenceId)) continue;
+        await ctx.write({
+          entity: 'transactions',
+          id: occurrenceId,
+          fields: { deleted: true, updatedAt },
+        });
+      }
+      await ctx.write({ entity: 'recurringRules', id, fields: { endDate, updatedAt } });
+    });
+  }
+
+  /**
    * @param {string} id
    * @param {string} updatedAt
    * @returns {Promise<void>}

@@ -68,7 +68,8 @@ next to the field, linked with `aria-describedby`.
 SyncScheduler ──► SyncEngine.sync()  (mutex; pull then push)
     pull: PROPFIND devices/ → GET head.json → GET segments → ChangeRecorder.applyRemote()
           (merge + cursor advance in one IndexedDB transaction per segment)
-    ──► RecurringService.materialize()
+    ──► AccountService.restoreUsed()      deleted accounts used again on another device come back
+    ──► RecurringService.materialize(), BudgetService.materialize()
     ──► ChangeFeed.publish({ source: 'remote' })  → the same store invalidation path
     push: segment PUT → head PUT → outbox trim
     maintenance: compaction when due (checkpoint → trimmed head) → delete own superseded files
@@ -96,7 +97,8 @@ which first builds `BrowserInstallEnvironment` so an early `beforeinstallprompt`
 
 1. open IndexedDB (running migrations), get or create the device id, set a default device name;
 2. build repositories and services;
-3. replay deferred remote ops, seed default categories once, materialize recurring transactions;
+3. replay deferred remote ops, seed default categories once, materialize recurring transactions
+   and recurring budgets;
 4. build the sync scheduler (`fetch` on every platform) and the stores;
 5. bind store invalidation, load all stores;
 6. start the local-midnight timer, ask for persistent storage where that never prompts

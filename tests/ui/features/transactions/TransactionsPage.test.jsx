@@ -40,7 +40,7 @@ describe('TransactionsPage', () => {
     );
 
     fireEvent.input(amount, { target: { value: '12,50' } });
-    fireEvent.change(within(dialog).getByLabelText('Category'), {
+    fireEvent.change(within(dialog).getByLabelText('Category (optional)'), {
       target: { value: 'seed:groceries' },
     });
     fireEvent.input(within(dialog).getByLabelText('Payee (optional)'), {
@@ -65,7 +65,8 @@ describe('TransactionsPage', () => {
     await waitFor(() => expect(amount.getAttribute('aria-invalid')).toBe('true'));
     const errorId = amount.getAttribute('aria-describedby') ?? '';
     expect(document.getElementById(errorId)?.textContent).toBe('Enter an amount.');
-    expect(within(dialog).getByText('This field is required.')).toBeTruthy();
+    // The category is optional, so it never blocks saving.
+    expect(within(dialog).queryByText('This field is required.')).toBeNull();
   });
 
   it('edits and deletes a transaction', async () => {
@@ -97,6 +98,76 @@ describe('TransactionsPage', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: /Cafe/ })).toBeNull());
     await ui.settled();
     expect(balanceOf(ui, 'Main')).toBe(10_000);
+  });
+
+  it('suggests earlier payees and fills the category and account of their last use', async () => {
+    const ui = await setup();
+    const card = await ui.stores.accounts.create({
+      name: 'Card',
+      type: 'creditCard',
+      currency: 'EUR',
+      openingBalance: '0',
+    });
+    await ui.stores.transactions.save({
+      kind: 'expense',
+      date: '2024-05-10',
+      amount: '20',
+      accountId: card.id,
+      categoryId: 'seed:groceries',
+      payee: 'Lidl',
+    });
+    await ui.stores.transactions.save({
+      kind: 'expense',
+      date: '2024-05-11',
+      amount: '1',
+      accountId: ui.account.id,
+    });
+    await ui.settled();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Add transaction' })[0]);
+    const dialog = await screen.findByRole('dialog', { name: 'Add transaction' });
+    const payee = /** @type {HTMLInputElement} */ (
+      await within(dialog).findByLabelText('Payee (optional)')
+    );
+    // The payee comes before the category and account it can fill.
+    const category = within(dialog).getByLabelText('Category (optional)');
+    expect(payee.compareDocumentPosition(category) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await waitFor(() => expect(payee.getAttribute('list')).toBeTruthy());
+    const options = document
+      .getElementById(payee.getAttribute('list') ?? '')
+      ?.querySelectorAll('option');
+    expect([...(options ?? [])].map((o) => o.value)).toEqual(['Lidl']);
+
+    fireEvent.input(payee, { target: { value: 'lidl' } });
+    expect(/** @type {HTMLSelectElement} */ (category).value).toBe('seed:groceries');
+    expect(/** @type {HTMLSelectElement} */ (within(dialog).getByLabelText('Account')).value).toBe(
+      card.id,
+    );
+  });
+
+  it('saves without a category and filters uncategorized transactions', async () => {
+    const ui = await setup();
+    await ui.stores.transactions.save({
+      kind: 'expense',
+      date: '2024-05-10',
+      amount: '7',
+      accountId: ui.account.id,
+      categoryId: 'seed:groceries',
+      payee: 'Market',
+    });
+    await ui.settled();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Add transaction' })[0]);
+    const dialog = await screen.findByRole('dialog', { name: 'Add transaction' });
+    fireEvent.input(await within(dialog).findByLabelText('Amount'), { target: { value: '3' } });
+    fireEvent.input(within(dialog).getByLabelText('Payee (optional)'), {
+      target: { value: 'Kiosk' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save transaction' }));
+    const row = await screen.findByRole('button', { name: /Kiosk/ });
+    expect(row.textContent).toContain('Uncategorized');
+
+    fireEvent.change(screen.getByLabelText('Category'), { target: { value: ':uncategorized' } });
+    await waitFor(() => expect(screen.queryByRole('button', { name: /Market/ })).toBeNull());
+    expect(screen.getByRole('button', { name: /Kiosk/ })).toBeTruthy();
   });
 
   it('filters by category and pages long lists', async () => {

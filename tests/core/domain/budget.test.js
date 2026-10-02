@@ -16,6 +16,7 @@ describe('budget', () => {
       categoryId: 'c',
       month: '2024-05',
       limitMinor: 30000,
+      recurring: false,
       currency: 'EUR',
     });
     expect(

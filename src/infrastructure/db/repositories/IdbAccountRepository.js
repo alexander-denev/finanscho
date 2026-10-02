@@ -1,5 +1,5 @@
 import { STORES } from '../database.js';
-import { byName, fieldsOf, visibleEntities, visibleEntity } from './recordMapping.js';
+import { byName, fieldsOf, toEntity, visibleEntities, visibleEntity } from './recordMapping.js';
 
 /** @typedef {import('../../../core/domain/account.js').Account} Account */
 /** @typedef {import('../database.js').Db} Db */
@@ -49,5 +49,24 @@ export class IdbAccountRepository {
    */
   async update(id, changes) {
     await this.#recorder.write({ entity: 'accounts', id, fields: fieldsOf(changes) });
+  }
+
+  /**
+   * @param {string} id
+   * @param {string} updatedAt
+   * @returns {Promise<void>}
+   */
+  async remove(id, updatedAt) {
+    await this.#recorder.write({ entity: 'accounts', id, fields: { deleted: true, updatedAt } });
+  }
+
+  /** @returns {Promise<Account[]>} */
+  async listDeleted() {
+    const records = /** @type {import('../../sync/merge.js').StoredRecord[]} */ (
+      await this.#db.getAll(STORES.accounts)
+    );
+    return records
+      .filter((r) => r.deleted === true && typeof r.createdAt === 'string')
+      .map((r) => toEntity(r));
   }
 }

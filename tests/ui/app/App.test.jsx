@@ -19,7 +19,7 @@ describe('App', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Add transaction' })[0]);
     const dialog = await screen.findByRole('dialog', { name: 'Add transaction' });
     fireEvent.input(await within(dialog).findByLabelText('Amount'), { target: { value: '30' } });
-    fireEvent.change(within(dialog).getByLabelText('Category'), {
+    fireEvent.change(within(dialog).getByLabelText('Category (optional)'), {
       target: { value: 'seed:transport' },
     });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save transaction' }));

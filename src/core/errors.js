@@ -54,6 +54,24 @@ export class NotFoundError extends AppError {
   }
 }
 
+/** An entity can't be deleted because other records still use it. Code: `<entity>InUse`. */
+export class InUseError extends AppError {
+  /** @type {string} */
+  entity;
+  /** @type {string} */
+  id;
+
+  /**
+   * @param {string} entity
+   * @param {string} id
+   */
+  constructor(entity, id) {
+    super(`${entity}InUse`, `${entity} ${id} is still in use`);
+    this.entity = entity;
+    this.id = id;
+  }
+}
+
 /** A backup file could not be read or has an unsupported format. */
 export class BackupError extends AppError {
   /** @param {'invalidFile' | 'formatTooNew'} code */
