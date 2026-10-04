@@ -142,3 +142,17 @@ UPPER_SNAKE_CASE only for true constants, `onX` for callback props.
 - Transport: one adapter, `FetchHttpAdapter`, on every platform; the server needs CORS
   (DECISIONS D35). Platform detection (`detectPlatform`) only picks the default device name and
   install instructions, never features.
+
+## Communication Style
+
+- Use plain language. Prefer everyday words over technical jargon. When a
+  technical term is truly needed, explain it in a few words the first time
+  you use it.
+- Never refer to something only by a label, number or shorthand I may not
+  remember (for example "§10.6", "hard rule 3", "the snapshot"). Say what it
+  is, e.g. "open question 10.6 in CLAUDE.md: what happens to a machine's
+  existing incidents when it moves to another folder".
+- When asking me to decide something, give enough background that I can
+  decide without opening another file: what the problem is, what each option
+  means in practice, what it costs, and which one you recommend and why.
+- Keep sentences short. One idea per bullet.
