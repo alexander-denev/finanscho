@@ -113,6 +113,10 @@ UPPER_SNAKE_CASE only for true constants, `onX` for callback props.
 - Accounts and categories can be deleted only when no transaction or rule uses them; after a
   pull, deleted ones that are used again are restored (D42, D48). Income and expenses may be
   uncategorized.
+- **Balance adjustments** (D49): "Reconcile balance" records one uncategorized income/expense dated
+  today with `adjustment: true` for the difference to the counted balance (balance through today).
+  It counts in balances but not in the dashboard's month income/spending or the uncategorized
+  filter; giving it a category (or making it a transfer) clears the flag.
 - v1 totals are grouped by currency (default EUR); no conversion.
 
 ## Sync invariants

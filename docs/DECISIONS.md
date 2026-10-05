@@ -559,3 +559,31 @@ deleted seed stays deleted.
   transaction or rule uses. `TransactionRepository.hasAnyForCategory` walks the `categoryId`
   index.
 - Deleting the category the transaction list is filtered by clears that filter.
+
+### D49. Reconcile balance
+
+Users who miss a transaction drift away from their real balance. **Reconcile balance** (account
+dialog) shows the balance the app has for today, asks for the balance the user counted, and
+records the difference as one **balance adjustment**: an uncategorized income or expense dated
+today with `adjustment: true`. Chosen over editing the opening balance, which would silently
+rewrite all history; the adjustment is visible, dated, and can be edited or deleted like any
+transaction. When the balances already match, nothing is recorded.
+
+- The comparison uses the **balance through today** (`netForAccount(id, through)`), so
+  future-dated transactions, which haven't happened yet, don't distort the difference. The account
+  list keeps showing the full balance as before. The date is always today (user decision); the
+  user can change it afterwards by editing the transaction.
+- Adjustments **count in balances but not in the dashboard's month income/spending** (user
+  decision), so months of missed small expenses don't look like one large expense this month.
+  They are in no budget (no category) and are left out of the "Uncategorized" filter, which is a
+  to-do list of transactions waiting for a category.
+- The Transactions page's "Net of shown transactions" **keeps** adjustments (user decision): it is
+  the change in money for the shown list, and the adjustment really changed the balance.
+- Giving an adjustment a category (or making it a transfer) clears the flag: the user has
+  identified what it was, so it counts like any other transaction.
+- Data compatibility: `adjustment` is a new optional field; absent means false. No migration.
+  Older app versions keep the field (unknown fields are preserved) but don't understand it: they
+  count adjustments in month totals and list them as uncategorized. If an older version gives an
+  adjustment a category, the flag stays set, and newer versions keep leaving that transaction out
+  of month totals. The user accepted this without a guard (such as treating only uncategorized
+  transactions as adjustments).

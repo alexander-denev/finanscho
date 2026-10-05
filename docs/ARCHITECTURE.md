@@ -87,7 +87,10 @@ Balances, budget spending, dashboard totals, and "next occurrence" dates are alw
   `toAccountId` indexes);
 - budget spent = expenses from the `[categoryId+date]` index for the month, in the budget's
   currency;
-- month flow = the month's transactions from the `[date+createdAt]` index.
+- month flow = the month's transactions from the `[date+createdAt]` index, without transfers and
+  balance adjustments (D49);
+- reconciling compares with the balance through today: `netForAccount(id, today)` skips
+  future-dated transactions.
 
 Nothing aggregated is stored, so there is nothing to conflict during sync.
 
