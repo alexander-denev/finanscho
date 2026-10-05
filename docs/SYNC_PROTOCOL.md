@@ -12,7 +12,7 @@ requires two devices to write the same file.
 ### 1.1 Records
 
 Every synced entity record (`accounts`, `categories`, `transactions`, `budgets`,
-`recurringRules`) is stored as its plain fields plus sync metadata:
+`automations`) is stored as its plain fields plus sync metadata:
 
 ```json
 {
@@ -82,12 +82,13 @@ between devices. Rules:
 
 - `v`: op format version (1). Ops with a higher `v` are skipped and reported, never half-applied.
 - `seq`: the device's local sequence number, gap-free and strictly increasing from 1.
-- `entity`: one of `accounts`, `categories`, `transactions`, `budgets`, `recurringRules`.
-  Ops for unknown entities are skipped (kept on the server for newer clients).
+- `entity`: one of `accounts`, `categories`, `transactions`, `budgets`, `automations`.
+  Ops for unknown entities are skipped (kept on the server for newer clients). Ops for retired
+  entities (`recurringRules`, written by versions before automations, D50) are dropped.
 - `fields`: the field values written. A create contains every field; an edit contains only the
   changed fields plus `updatedAt`. A delete is `{ "deleted": true, "updatedAt": … }`.
-- `origin`: `"user"` or `"recurrence"` (occurrences materialized from a recurring rule, and
-  recurring budgets copied into a new month).
+- `origin`: `"user"` or `"automation"` (results of an automation). Older versions also wrote
+  `"recurrence"`. Informational only: clients accept any string.
 - Unknown fields inside `fields` are stored as-is, so older clients never destroy newer data.
 
 ## 2. Merge
@@ -118,32 +119,30 @@ wins locally.
 Records that two devices can create independently before syncing use deterministic IDs so they
 merge into one record instead of duplicating:
 
-| Record                   | ID                       | Clock used for its fields               |
-| ------------------------ | ------------------------ | --------------------------------------- |
-| Seeded category          | `seed:<slug>`            | `SEED_HLC` (minimum)                    |
-| Budget                   | `<categoryId>:<YYYY-MM>` | normal local HLC                        |
-| Recurring budget copy    | `<categoryId>:<YYYY-MM>` | the source budget's newest field clock  |
-| Recurring occurrence     | `<ruleId>:<YYYY-MM-DD>`  | the rule's creation clock               |
-| Skipped occurrence (D44) | `<ruleId>:<YYYY-MM-DD>`  | normal local HLC (a tombstone, no data) |
+| Record                         | ID                                      | Clock used for its fields   |
+| ------------------------------ | --------------------------------------- | --------------------------- |
+| Seeded category                | `seed:<slug>`                           | `SEED_HLC` (minimum)        |
+| Budget                         | `<categoryId>:<YYYY-MM>`                | normal local HLC            |
+| Budget set by an automation    | `<categoryId>:<YYYY-MM>`                | the automation's rule clock |
+| Transaction from a schedule    | `<automationId>:t<i>:a<j>:<YYYY-MM-DD>` | the automation's rule clock |
+| Transaction from a transaction | `<automationId>:a<j>:<sourceId>`        | the automation's rule clock |
+| Run now                        | `<automationId>:run:<uuid>`             | normal local HLC            |
 
-Recurring occurrences are built entirely from the immutable rule (including `createdAt` and
-`updatedAt`, which equal the rule's `createdAt`) and are written with the rule's creation clock
-(`rule._clocks.createdAt`). Two devices materializing the same occurrence therefore produce
-byte-identical fields and clocks, and any later user edit or deletion (with a newer HLC) wins.
-Materialization never writes an occurrence whose ID already exists locally, in any state
-(including deleted), so deleting an occurrence is permanent. Existing IDs are found by the key
-prefix `<ruleId>:`, so tombstone stubs (which drop `recurringRuleId`) still count.
+`t<i>` and `a<j>` are the trigger's and the step's positions; the date is the **planned** date
+(before a weekend shift). The **rule clock** is the newest clock among the automation's rule
+fields (`triggers`, `conditions`, `actions`, `startDate`), read inside the IndexedDB
+transaction that writes the results (D51). Results are built only from those fields, the planned
+date, and the recorded transaction, and `createdAt`/`updatedAt` are the clock's time (or the
+recorded transaction's creation time when later). Two devices making the same result from the
+same version therefore write byte-identical records; when one device used an older version, the
+newer version's clock wins; any user edit or deletion (a fresh HLC) beats both.
 
-Resuming a stopped rule, or moving its dates without changing its transaction, clears or moves
-its `endDate` in place (D44). The occurrence dates that fell while it was stopped are first
-written as tombstones (`deleted: true`, no other fields) in the same IndexedDB transaction, before
-the `endDate` op, so every device that sees the new end date has already seen them.
-
-A recurring budget (`recurring: true`) is copied into each later month up to the current one,
-unless that month already has a record in any state (D43). A copy holds the source's fields with
-the new month and is written with the source's newest field clock, with origin `"recurrence"`.
-Devices copying the same source write identical records; a copy of a newer source wins; a user
-edit (a fresh clock) beats every copy.
+A result is never written when its ID already exists locally in any state (including deleted), so
+deleting a result is permanent, and a budget month that has any record (the user's own, or a
+deleted one) is left alone. Existing transaction IDs are found by the key prefix
+`<automationId>:`, so tombstone stubs still count. Automations are edited in place (D52): an edit
+to the rule fields moves `startDate` to today, and resuming sets `startDate` to today, so no
+device fills in dates before it.
 
 ## 4. Local write path
 
@@ -235,10 +234,9 @@ request during a running cycle is coalesced into one follow-up cycle.
    `seq > cursor` and set the cursor to the segment's last seq.
 4. A malformed head or segment is skipped and reported (`malformed`) without crashing; the cursor
    does not move past it, so it is retried next cycle. Other devices still sync.
-5. After pulling, restore deleted accounts and categories that a transaction or rule uses again
-   (D42, D48), run
-   recurring materialization (transactions, then budgets), then publish
-   `{ entities, source: 'remote' }`.
+5. After pulling, restore deleted accounts and categories that a transaction or automation uses
+   again (D42, D48, D53), run automations (schedules always; "a transaction is recorded" only when
+   transactions or automations arrived), then publish `{ entities, source: 'remote' }`.
 
 ### 6.3 Push
 
@@ -310,8 +308,8 @@ When WebDAV is configured, a cycle runs on app start; on resume (`visibilitychan
 in the foreground; and on "Sync now". Transient failures (offline, network, 5xx) back off
 exponentially (5 s, 10 s, 20 s … capped at 5 minutes). Auth, format, and configuration errors
 get no backoff retries; the regular triggers (resume, the 5-minute interval, "Sync now", and
-changing the settings) still try again. Recurring materialization (transactions and budgets) also
-runs at local midnight while the app is open.
+changing the settings) still try again. Automations also run at local midnight while the app is
+open, and shortly after local transaction changes.
 
 ## 10. Compaction
 
@@ -397,7 +395,7 @@ rewrite older than them may still win `deleted`.
 - Checkpoints always publish tombstones as stubs.
 - `ChangeRecorder.pruneTombstones` rewrites tombstones deleted more than 30 days ago as stubs at
   startup. This is local only (no ops) and drops them from the `date`/`accountId` indexes.
-- **Stubs are never purged**: recurring materialization relies on the ID existing (§3), and
+- **Stubs are never purged**: automations rely on a result's ID existing (§3), and
   `_clocks.deleted` must keep beating late ops. The remaining growth is about 150 bytes per
   deletion.
 

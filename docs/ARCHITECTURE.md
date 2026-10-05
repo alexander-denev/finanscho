@@ -32,9 +32,9 @@ per folder, plus `import-x/no-cycle`:
 
 | Folder                        | Contents                                                                                                                                                                                                                                          |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/core/domain`             | Pure rules: money (minor units), local dates, entity factories/validators, recurrence schedule. No I/O, no clock.                                                                                                                                 |
+| `src/core/domain`             | Pure rules: money (minor units), local dates, entity factories/validators, recurrence schedule, automations (When/If/Do, result building). No I/O, no clock.                                                                                      |
 | `src/core/ports`              | JSDoc contracts: repositories, clock, id generator, change feed, credential store, sync transport/control.                                                                                                                                        |
-| `src/core/services`           | Use cases with constructor injection: accounts, categories, transactions, budgets, recurring, dashboard, backup, settings.                                                                                                                        |
+| `src/core/services`           | Use cases with constructor injection: accounts, categories, transactions, budgets, automations, dashboard, backup, settings.                                                                                                                      |
 | `src/core/errors.js`          | Typed errors (`ValidationError`, `NotFoundError`, `BackupError`, `SyncError`) with stable codes for i18n.                                                                                                                                         |
 | `src/infrastructure/db`       | `database.js` (schema + migrations), `ChangeRecorder` (the only entity writer), IndexedDB repositories, credential store.                                                                                                                         |
 | `src/infrastructure/sync`     | `HybridLogicalClock`, `operation.js`, `deviceHead.js`, `merge.js` (pure LWW merge), `SyncEngine` (pull/push), `SyncScheduler` (triggers, backoff, status), `webdav/` (client, adapters).                                                          |
@@ -70,7 +70,7 @@ SyncScheduler ──► SyncEngine.sync()  (mutex; pull then push)
           (merge + cursor advance in one IndexedDB transaction per segment)
     ──► AccountService/CategoryService.restoreUsed()  deleted accounts and categories used again
                                           on another device come back
-    ──► RecurringService.materialize(), BudgetService.materialize()
+    ──► AutomationService.run({ events: transactions or automations arrived })
     ──► ChangeFeed.publish({ source: 'remote' })  → the same store invalidation path
     push: segment PUT → head PUT → outbox trim
     maintenance: compaction when due (checkpoint → trimmed head) → delete own superseded files
@@ -81,7 +81,7 @@ Stores never know about sync; they only react to the change feed.
 
 ## Derived data
 
-Balances, budget spending, dashboard totals, and "next occurrence" dates are always computed:
+Balances, budget spending, dashboard totals, and automations' next dates are always computed:
 
 - account balance = opening balance + `netForAccount()` (streamed through the `accountId` and
   `toAccountId` indexes);
@@ -101,11 +101,12 @@ which first builds `BrowserInstallEnvironment` so an early `beforeinstallprompt`
 
 1. open IndexedDB (running migrations), get or create the device id, set a default device name;
 2. build repositories and services;
-3. replay deferred remote ops, seed default categories once, materialize recurring transactions
-   and recurring budgets;
+3. replay deferred remote ops, seed default categories once, run automations (make what they owe
+   since the app last ran);
 4. build the sync scheduler (`fetch` on every platform) and the stores;
-5. bind store invalidation, load all stores;
-6. start the local-midnight timer, ask for persistent storage where that never prompts
+5. bind store invalidation and the debounced automation run after local transaction changes
+   (`runAutomationsOnChange`), load all stores;
+6. start the local-midnight timer (runs automations), ask for persistent storage where that never prompts
    (`InstallStore.protectSilently`, D38), start sync in the background;
 7. register the service worker (`infrastructure/platform/serviceWorker.js`).
 

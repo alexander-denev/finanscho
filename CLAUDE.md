@@ -56,7 +56,7 @@ files — import each module from its own file, with the extension.
 - `app`: `createContainer.js` builds infrastructure → services → stores, binds store
   invalidation to the change feed (`storeInvalidation.js`), starts sync/midnight timers.
 - Store signals: `AccountsStore.items/active/archived/totals/byId`, `TransactionsStore.days/total`,
-  `BudgetsStore.data/totals`, `SyncStore.syncStatus` (live sync state) + `config`,
+  `BudgetsStore.data/totals`, `AutomationsStore.automations/upcoming`, `SyncStore.syncStatus` (live sync state) + `config`,
   `InstallStore.installed/canPrompt/guidance/persisted/showBanner` (install + storage protection).
 - Feature folders: `ui/features/<feature>/` hold the page + feature-specific components. A
   component used by two or more features moves to `ui/components` and becomes feature-agnostic.
@@ -98,20 +98,22 @@ UPPER_SNAKE_CASE only for true constants, `onX` for callback props.
   (`createdAt`, `updatedAt`) are ISO UTC.
 - **No stored aggregates**: balances and budget "spent" are computed from indexed queries.
 - IDs: `crypto.randomUUID()` via injected generator; deterministic IDs where devices may create
-  the same record: seeded categories `seed:<slug>`, budgets `<categoryId>:<YYYY-MM>`, recurring
-  occurrences `<ruleId>:<YYYY-MM-DD>`.
-- **Recurring rules are immutable** after creation except `endDate` and `deleted`. Changing the
-  template or cadence = end the old rule the day before the effective date + create a new rule
-  with `previousRuleId` (the list hides replaced rules). Stop, resume, and date-only edits change
-  `endDate` in place; dates skipped while stopped are written as tombstones first (D44).
-  Materialization (app start, after sync, local midnight) creates occurrences up to today, max 366
-  per rule per run, never rewrites an existing ID (even deleted; found by the `<ruleId>:` key
-  prefix), writes occurrences with the rule's creation clock, and deleting a rule keeps existing
-  occurrences.
-- **Recurring budgets** (`recurring: true`) are copied forward month by month up to the current
-  month with the source's clock, stopping at any month that has a record in any state (D43).
-- Accounts and categories can be deleted only when no transaction or rule uses them; after a
-  pull, deleted ones that are used again are restored (D42, D48). Income and expenses may be
+  the same record: seeded categories `seed:<slug>`, budgets `<categoryId>:<YYYY-MM>`, automation
+  results `<automationId>:t<i>:a<j>:<YYYY-MM-DD>` (schedule) and `<automationId>:a<j>:<sourceId>`
+  (recorded transaction).
+- **Automations** (D50–D53): When (schedules, "a transaction is recorded") → If (all/any checks,
+  groups one level deep) → Do (create transaction with a fixed or % amount; set budget). They
+  automate the user's input: results are ordinary records with only an `automationId`, and edits
+  never touch existing results. Edited in place; an edit to When/If/Do moves `startDate` to
+  today, Stop sets `endDate` to yesterday, Resume sets `startDate` to today, so nothing in the
+  past is filled in. `AutomationService.run` (app start, after pull, local midnight, debounced
+  after local transaction changes) writes what's due within each automation's window, max 366 per
+  automation per run, never an ID that exists in any state (found by the `<automationId>:` key
+  prefix). Results are built only from rule fields, the planned date, and the recorded
+  transaction; automation-made transactions and balance adjustments never trigger anything. No
+  balance checks (devices could disagree). Set budget steps store their currency.
+- Accounts and categories can be deleted only when no transaction or automation uses them; after
+  a pull, deleted ones that are used again are restored (D42, D48, D53). Income and expenses may be
   uncategorized.
 - **Balance adjustments** (D49): "Reconcile balance" records one uncategorized income/expense dated
   today with `adjustment: true` for the difference to the counted balance (balance through today).
@@ -133,7 +135,8 @@ UPPER_SNAKE_CASE only for true constants, `onX` for callback props.
   segments in order with cursor advance in one IDB transaction per segment. Pull then push, one
   cycle at a time.
 - Never write to a vault whose `format` is newer than supported. Validate every downloaded file.
-- Seeds use `SEED_HLC` (minimum clock); occurrences use the rule's `_clocks.createdAt`; backup
+- Seeds use `SEED_HLC` (minimum clock); automation results use the rule clock (newest clock of
+  `triggers`/`conditions`/`actions`/`startDate`, read inside the writing transaction); backup
   import and vault switches replay records through `ChangeRecorder` with their original clocks.
 - **Compaction** (SYNC_PROTOCOL §10, D39): a device re-queues its full state as a checkpoint
   (`queueCheckpoint`, empty outbox only), publishes it, trims its own head to the checkpoint, and

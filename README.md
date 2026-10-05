@@ -1,7 +1,7 @@
 # Finanscho
 
-A local-first personal finance manager. Track accounts, transactions, monthly budgets, and
-recurring payments. Everything works offline and is stored on your device; optionally, connect
+A local-first personal finance manager. Track accounts, transactions, and monthly budgets, and
+let automations do the routine work. Everything works offline and is stored on your device; optionally, connect
 your own WebDAV server (for example Nextcloud) to keep several devices in sync.
 
 Finanscho is a single installable web app (PWA) for desktop, Android, and iOS. After the first
@@ -11,7 +11,10 @@ your data.
 - **Accounts**: cash, checking, savings, credit card, other; opening balance, color, archive.
 - **Transactions**: expenses, income, transfers; filter by account, category, month, and text.
 - **Budgets**: monthly limit per expense category, progress, "Copy last month's budgets".
-- **Recurring**: daily/weekly/monthly/yearly rules; due transactions are created automatically.
+- **Automations**: "When … If … Do …". When: a schedule (daily to yearly, last day of the month,
+  move off weekends) or a transaction being recorded. If: checks on that transaction, combined with
+  all/any. Do: create transactions (a fixed amount or a percentage) or set budgets. Run now,
+  preview, history, and fill-in words like `{month}`.
 - **Dashboard**: balances, totals per currency, this month's money in/out, budget status, the
   next 30 days.
 - **Settings**: default currency, theme, device name, WebDAV sync, JSON backup export/import.

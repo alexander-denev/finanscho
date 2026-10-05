@@ -80,6 +80,8 @@ required to document `@returns` on small helpers (`jsdoc/reject-any-type` and
 
 ### D13. Extra IndexedDB indexes
 
+_The `recurringRuleId` index was dropped in schema v2 (D50); it was never read._
+
 Besides the indexes named in the brief, `transactions` has `[date+createdAt]` (the list order:
 newest date, then newest entry, walked with a cursor so pages stay bounded) and
 `recurringRuleId`; `categories` has `kind`. Adding indexes later would need a migration, so they
@@ -384,6 +386,8 @@ checkpoint (SYNC_PROTOCOL §10):
 
 ### D40. Tombstone stubs, kept forever
 
+_Since D50 the reason is automation results: they are made only when their ID exists in no state._
+
 Tombstones are never purged: recurring materialization skips IDs that exist in any state (SYNC_PROTOCOL
 §3: deleting an occurrence is permanent), and `_clocks.deleted` must keep beating late
 ops. They shrink instead: checkpoints publish stubs, and `pruneTombstones` rewrites tombstones
@@ -448,6 +452,8 @@ anything else is archived. `AccountService.remove` enforces this and throws `InU
 
 ### D43. Recurring budgets copied forward, not inherited
 
+_Replaced by automations (D50): a Set budget step does this now._
+
 A per-budget "Repeat every month" switch (off by default; "Copy last month's budgets" stays for
 budgets that don't repeat). Two designs were considered: a standing per-category limit with
 monthly overrides (one record, but changing it rewrites history and needs an "explicit none"
@@ -467,6 +473,8 @@ marker), and **materialized monthly copies** (chosen), following recurring trans
   category and month). Budgets are one per category and month, so this stays small.
 
 ### D44. Stop/resume keeps the same rule
+
+_Replaced by automations (D50, D52): resume moves the start date instead of writing tombstones._
 
 Bug: stopping a recurring transaction and starting it again "copied" it and created an extra
 transaction. Every edit ended the rule and created a new one, and for a stopped rule the form's
@@ -544,6 +552,8 @@ today (a duplicate when the old rule had already created today's).
 
 ### D48. Deleting categories: only unused ones, like accounts
 
+_Rules became automations (D50); a Set budget step now counts as use (D53)._
+
 Users asked to delete categories, not only archive them. Same rule as accounts (D42): **a category
 that no transaction and no recurring rule (including ended ones) uses can be deleted**; anything
 else is archived. `CategoryService.remove` throws `InUseError` (`categoryInUse`); the Categories
@@ -587,3 +597,108 @@ transaction. When the balances already match, nothing is recorded.
   adjustment a category, the flag stays set, and newer versions keep leaving that transaction out
   of month totals. The user accepted this without a guard (such as treating only uncategorized
   transactions as adjustments).
+
+## 2026-10-05
+
+### D50. Automations replace recurring transactions and recurring budgets
+
+Recurring transactions (D44) and the budget "Repeat every month" switch (D43) only reacted to
+dates and were two features doing one job. Both are replaced by **automations**: "When [trigger]
+→ If [checks] → Do [steps]" (user decision; names chosen with the user: When / If / Do on screen,
+`triggers` / `conditions` / `actions` in code, because `if` and `do` are reserved words).
+
+- **When**: one or more triggers, any of which starts the automation: a schedule (the existing
+  recurrence math, plus "last day of the month" via an `anchorDay` of 31 and a weekend rule:
+  keep, Friday before, Monday after) or "a transaction is recorded" (at most one).
+- **If**: checks on the recorded transaction (account, to-account, type, category, payee,
+  amount), combined with all/any in groups one level deep (user decision: like Notion filters).
+- **Do**: one or more steps: create a transaction (fixed amount, or a percentage of the recorded
+  transaction) or set a budget. Payee and note take fill-in words (`{date}`, `{month}`, `{year}`,
+  `{payee}`, `{amount}`, `{note}`); a "Fill-in words" help box lists them.
+- Also: Run now, a live preview in the form, a history per automation, and "Made by" in the
+  transaction dialog. No templates and no approval step (user decisions).
+- **No migration** (user decision: the app has one user so far). Schema v2 drops the
+  `recurringRules` store and the never-read `recurringRuleId` index and adds `automations`; the
+  released v1 migration now names the removed store and index with literals. Old ops for
+  `recurringRules` are **dropped** on arrival and from the deferred list (`RETIRED_ENTITIES`),
+  not deferred: no version will apply them, and deferred ops would keep the device out of the
+  checkpoint frontier and block device removal. Old backups import without their rules.
+- **Compatibility.** Transactions made by old rules keep `recurringRuleId`; they still show the
+  "Automatic" badge and never set off an automation. Budgets now always write `recurring: false`
+  (and `automationId`), so a not-yet-updated device never copies forward a budget this version
+  wrote. Older app versions defer `automations` ops ("some changes need a newer version"), so
+  every device should be updated.
+- Smaller deviations: tapping a fill-in word adds it at the **end** of the field (the inputs don't
+  expose the cursor position; appending works the same on phones). The history list is read-only:
+  the transaction dialog belongs to the transactions feature, and features may not import each
+  other's containers.
+
+### D51. Automation results: predictable IDs, the rule clock, no loops
+
+Everything an automation makes gets a predictable ID, so two devices that both make it produce
+one merged record: `<automationId>:t<i>:a<j>:<planned date>` (schedule),
+`<automationId>:a<j>:<source transaction id>` (recorded transaction), and the ordinary budget ID
+`<categoryId>:<YYYY-MM>`. A result is written only if its ID exists in no state (so deleting one is
+permanent; a budget month that has any record is left alone), in the same IndexedDB transaction
+as the check (`IdbAutomationRepository.writeResults`).
+
+- **Rule clock.** Every result is written with the newest clock among the automation's rule
+  fields (`triggers`, `conditions`, `actions`, `startDate`). Every device with the same version
+  derives the same clock, and each rule edit makes it newer, so when an offline device makes a
+  result from the old version and another from the edited one, **the edited one wins**; any edit
+  by the user (a fresh clock) beats both. A first draft used "the later of the rule clock and the
+  recorded transaction's creation clock"; that gives both versions the same clock whenever the
+  transaction is newer than the edit (the usual case), so the winner would be arbitrary.
+  `createdAt`/`updatedAt` are the clock's time, or the recorded transaction's creation time when
+  later, so a result sorts next to its source.
+- **Pure building.** Results are built only from the rule fields, the planned date, and the
+  recorded transaction, never from fields that can change (name, end date, settings). Fill-in
+  words use a fixed `'en'` (the app is English-only); `{amount}` is the decimal string plus the
+  currency code; payee checks use `toLowerCase()`, so devices with other locales agree. The
+  weekend rule moves only the date: the ID, the date window and `{month}`/`{year}` use the planned
+  date, and planned dates are looked at two days ahead so "Friday before" is made on Friday.
+- **Scan, don't listen.** "A transaction is recorded" is evaluated by scanning, like schedules:
+  at startup, after every pull (only when transactions or automations arrived), at local
+  midnight, and debounced after local transaction changes (`runAutomationsOnChange`). Every
+  automation that isn't deleted runs within its own start-to-end window (dated on or before
+  today), so a late-synced transaction dated inside an ended automation's window still gets its
+  result on every device. Runs are single-flight; at most 366 results per automation per run.
+- **No loops.** Transactions with an `automationId` (or an old `recurringRuleId`) and balance
+  adjustments never set an automation off.
+- **No balance checks** (user agreed): two devices may disagree on a balance until they sync, so
+  one would act and the other wouldn't.
+- **Known limits.** Two offline devices can compute different values for a percentage or for
+  `{payee}`/`{note}` when one of them edited the source transaction; they converge on one value,
+  but not always the newer one. Two devices editing different parts of one automation offline
+  get both edits (per-field merge, as for every record).
+
+### D52. Automations are edited in place
+
+Every field of an automation can be edited (user decision), and an edit changes only what happens
+from then on: what it already made is never touched (user decision: automations automate the
+user's input; results keep only `automationId`, for the history and "Made by").
+
+- **Editing When, If or Do** moves `startDate` to today (unless the user moved it, or it is later),
+  so nothing in the past is filled in. Renames and end-date edits change only that field.
+- **Stop** sets `endDate` to yesterday, so a transaction recorded today no longer sets it off.
+  **Resume** sets `startDate` to today and clears `endDate` in one write: the pause falls outside
+  the window and is never filled. Extending the end of a stopped automation works like resuming.
+  This replaces D44's tombstones for skipped dates, which can't work for budgets (their ID is
+  shared with budgets the user sets), and needs no `previousRuleId` chain.
+- **Run now** is a normal user action: fresh IDs (`<automationId>:run:<uuid>`) and clocks; a Set
+  budget step replaces this month's budget. It is disabled when a step uses a percentage.
+
+### D53. Automations keep what they use; budget steps store their currency
+
+- An account or category used anywhere in an automation (checks or steps, including ended
+  automations) can't be deleted, and a deleted one is restored after a pull when an automation
+  uses it again (as D42/D48 do for transactions). This includes a category used only by a Set
+  budget step, unlike D48's "budgets alone don't count": the automation will keep setting that
+  budget.
+- At run time archived (or deleted) accounts and categories are **not** checked: that can change,
+  so checking it would make devices disagree. The automation's row warns instead.
+- A Set budget step stores its **currency** when the automation is saved (the default currency
+  then) and keeps it through edits. The default currency is a device setting, not synced, so
+  reading it at run time would let two devices write different budgets under the same ID.
+- Budgets the user sets or copies write `automationId: null`, so they drop out of the
+  automation's history, and `recurring: false` (see D50).
