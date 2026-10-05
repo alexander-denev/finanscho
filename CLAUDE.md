@@ -101,7 +101,9 @@ UPPER_SNAKE_CASE only for true constants, `onX` for callback props.
   the same record: seeded categories `seed:<slug>`, budgets `<categoryId>:<YYYY-MM>`, automation
   results `<automationId>:t<i>:a<j>:<YYYY-MM-DD>` (schedule) and `<automationId>:a<j>:<sourceId>`
   (recorded transaction).
-- **Automations** (D50–D53): When (schedules, "a transaction is recorded") → If (all/any checks,
+- **Automations** (D50–D55): When (calendar-style schedules: every N days/weeks/months/years on
+  chosen weekdays, a day of the month or the Nth weekday, or a date; `phase` instead of a start
+  date, see `repeatSchedule.js`; or "a transaction is recorded") → If (all/any checks,
   groups one level deep) → Do (create transaction with a fixed or % amount; set budget). They
   automate the user's input: results are ordinary records with only an `automationId`, and edits
   never touch existing results. Edited in place; an edit to When/If/Do moves `startDate` to

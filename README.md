@@ -11,8 +11,9 @@ your data.
 - **Accounts**: cash, checking, savings, credit card, other; opening balance, color, archive.
 - **Transactions**: expenses, income, transfers; filter by account, category, month, and text.
 - **Budgets**: monthly limit per expense category, progress, "Copy last month's budgets".
-- **Automations**: "When … If … Do …". When: a schedule (daily to yearly, last day of the month,
-  move off weekends) or a transaction being recorded. If: checks on that transaction, combined with
+- **Automations**: "When … If … Do …". When: a calendar-style schedule (every N days, weeks on
+  chosen weekdays, months on a day or e.g. the last Friday, years on a date; move off weekends)
+  or a transaction being recorded. If: checks on that transaction, combined with
   all/any. Do: create transactions (a fixed amount or a percentage) or set budgets. Run now,
   preview, history, and fill-in words like `{month}`.
 - **Dashboard**: balances, totals per currency, this month's money in/out, budget status, the

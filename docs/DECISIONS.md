@@ -602,6 +602,8 @@ transaction. When the balances already match, nothing is recorded.
 
 ### D50. Automations replace recurring transactions and recurring budgets
 
+_Schedules changed to a calendar-style repeat (D54); the editor became its own page (D55)._
+
 Recurring transactions (D44) and the budget "Repeat every month" switch (D43) only reacted to
 dates and were two features doing one job. Both are replaced by **automations**: "When [trigger]
 → If [checks] → Do [steps]" (user decision; names chosen with the user: When / If / Do on screen,
@@ -702,3 +704,44 @@ user's input; results keep only `automationId`, for the history and "Made by").
   reading it at run time would let two devices write different budgets under the same ID.
 - Budgets the user sets or copies write `automationId: null`, so they drop out of the
   automation's history, and `recurring: false` (see D50).
+
+### D54. Calendar-style schedules without a starting date
+
+Users set schedules like a calendar's custom repeat (user request, modelled on Google Calendar):
+"repeat every N days / weeks / months / years", plus which days: weekday toggles for weeks, "day
+15" / "last day" or "the first … fourth / last Friday" for months, month + day for years. This
+replaces "first date + every N + last day of month".
+
+- **No starting date** (user asked for "full scheduling freedom" without one). "Every N" needs to
+  know which round is on, so every date belongs to a round counted from a fixed point (days since
+  1970-01-01, ISO weeks since Monday 1970-01-05, months since January 1970, calendar years) and a
+  schedule stores `phase`: it is on in the rounds where `round mod every = phase`
+  (`core/domain/repeatSchedule.js`). The form never shows the number; for N ≥ 2 it asks "First
+  time: this week / next week / in 2 weeks" and turns the choice into the phase
+  (`phaseFor`/`roundsUntil`). Every device computes the same dates, and nothing shifts when the
+  automation is edited or resumed (its `startDate` only bounds the window).
+- Day 31 means the last day of the month ("Last day" in the picker); a yearly 29 February is
+  28 February in common years. The weekend rule applies only to a day of the month and to
+  years: weeks and "the Nth weekday" already pick the day.
+- `recurrenceSchedule.js` (anchor date + interval) is gone. Saved automations from D50 are not
+  converted: that version was never released.
+
+### D55. The automation editor: its own page, short lines, small windows
+
+The first editor showed every field of every item at once, filled with defaults the user hadn't
+chosen. It is now **its own page** (`/automations/new`, `/automations/:id`; user decision):
+
+- When, If and Do start **empty**. "+ Add" first asks the kind of item (a schedule or "a
+  transaction is recorded"; which field a check looks at, or a group; create transaction or set
+  budget), and **the kind never changes**: to switch, delete the item and add another (user
+  decision).
+- Each item shows as **one short line** ("Every 2 weeks on Fri", "Transfer 10% · Checking →
+  Savings"); tapping it opens a **small window** with just that item's fields
+  (`automationText.js` writes the lines). A group is one line; its window holds all/any and its
+  checks as rows, so windows never stack (user decision).
+- **One Save for the whole automation** (user decision): "Done" in a window only changes the page,
+  and Cancel on the page throws every change away. "Done" checks the item's own fields through the
+  service's preview and keeps the window open on errors; errors that depend on other items (a
+  percentage needs a recorded transaction) show at Save, with "Needs attention" on the line.
+- Stop, Resume, and Delete change the stored automation, so the page returns to the list after
+  them instead of keeping a draft that no longer matches; Run now and History stay on the page.
