@@ -23,6 +23,8 @@
 .header {
   position: sticky;
   top: 0;
+  /* Above positioned field frames and the combo box (5) while the body scrolls under it. */
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: space-between;
