@@ -78,4 +78,19 @@ describe('DashboardService', () => {
     expect(summary.budgets.over).toBe(1);
     expect(summary.upcoming.map((u) => u.date)).toEqual(['2024-05-20']);
   });
+
+  it('counts balance adjustments in balances but not in month income or spending', async () => {
+    const t = await createTestServices();
+    const main = await makeAccount(t, 'Main', '100');
+    await t.services.transactions.create({
+      kind: 'expense',
+      date: '2024-05-03',
+      amount: '10',
+      accountId: main.id,
+    });
+    await t.services.accounts.reconcile(main.id, { balance: '50' });
+    const summary = await t.services.dashboard.summary();
+    expect(summary.balances[0].balanceMinor).toBe(5_000);
+    expect(summary.monthFlow).toEqual([{ currency: 'EUR', incomeMinor: 0, expenseMinor: 1_000 }]);
+  });
 });

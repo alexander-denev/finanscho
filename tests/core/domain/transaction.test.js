@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   balanceEffect,
   compareTransactionsNewestFirst,
+  createBalanceAdjustment,
   createTransaction,
   normalizeTransactionInput,
 } from '../../../src/core/domain/transaction.js';
@@ -133,5 +134,41 @@ describe('transaction', () => {
       t('c', '2024-01-01', 'x2'),
     ].sort(compareTransactionsNewestFirst);
     expect(sorted.map((x) => x.id)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('builds a balance adjustment for the difference to the counted balance', () => {
+    const base = { accountId: 'a1', currency: 'EUR', bookMinor: 10_000, date: '2024-05-15' };
+    expect(createBalanceAdjustment({ ...base, actual: '120,50' }, ctx)).toEqual({
+      id: 'id-1',
+      kind: 'income',
+      date: '2024-05-15',
+      amountMinor: 2_050,
+      accountId: 'a1',
+      toAccountId: null,
+      categoryId: null,
+      payee: '',
+      note: '',
+      recurringRuleId: null,
+      adjustment: true,
+      createdAt: ctx.now,
+      updatedAt: ctx.now,
+      deleted: false,
+    });
+    expect(createBalanceAdjustment({ ...base, actual: '-30' }, ctx)).toMatchObject({
+      kind: 'expense',
+      amountMinor: 13_000,
+      adjustment: true,
+    });
+    expect(createBalanceAdjustment({ ...base, actual: '100.00' }, ctx)).toBeNull();
+  });
+
+  it('rejects an invalid counted balance', () => {
+    const base = { accountId: 'a1', currency: 'EUR', bookMinor: 0, date: '2024-05-15' };
+    expect(fieldErrors(() => createBalanceAdjustment({ ...base, actual: '' }, ctx))).toEqual({
+      balance: 'validation.money.empty',
+    });
+    expect(fieldErrors(() => createBalanceAdjustment({ ...base, actual: '1.234' }, ctx))).toEqual({
+      balance: 'validation.money.tooManyDecimals',
+    });
   });
 });

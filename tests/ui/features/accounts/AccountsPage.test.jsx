@@ -120,4 +120,45 @@ describe('AccountsPage', () => {
     expect(screen.queryByRole('radio', { name: /Archived/ })).toBeNull();
     expect(within(screen.getByRole('list', { name: 'Accounts' })).getByRole('button')).toBeTruthy();
   });
+
+  it('reconciles an account with the counted balance', async () => {
+    const ui = await createUiStores({ path: '/accounts' });
+    const main = await ui.stores.accounts.create({
+      name: 'Main',
+      type: 'checking',
+      currency: 'EUR',
+      openingBalance: '100',
+    });
+    await ui.stores.transactions.save({
+      kind: 'expense',
+      date: '2024-05-10',
+      amount: '20',
+      accountId: main.id,
+    });
+    await ui.settled();
+    renderWithStores(<AccountsPage />, ui.stores);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Main/ }));
+    let dialog = await screen.findByRole('dialog', { name: 'Edit account' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Reconcile balance' }));
+    dialog = await screen.findByRole('dialog', { name: 'Reconcile balance' });
+    expect(dialog.textContent).toContain('€80.00');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Reconcile' }));
+    expect(await within(dialog).findByText('Enter an amount.')).toBeTruthy();
+
+    fireEvent.input(within(dialog).getByLabelText('Actual balance'), {
+      target: { value: '75' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Reconcile' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(ui.stores.toasts.toasts.value.at(-1)).toMatchObject({
+      key: 'toast.reconciled',
+      params: { amount: '-€5.00' },
+    });
+    const list = screen.getByRole('list', { name: 'Accounts' });
+    await waitFor(() =>
+      expect(within(list).getByRole('button', { name: /Main/ }).textContent).toContain('€75.00'),
+    );
+  });
 });

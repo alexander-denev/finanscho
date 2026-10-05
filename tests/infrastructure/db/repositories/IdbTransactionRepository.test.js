@@ -123,6 +123,32 @@ describe('IdbTransactionRepository', () => {
     expect(await repo.netForAccount('none')).toBe(0);
   });
 
+  it('limits an account net to transactions dated on or before a day', async () => {
+    await repo.create(tx({ id: 'past', kind: 'income', date: '2024-05-14', amountMinor: 500 }));
+    await repo.create(tx({ id: 'today', date: '2024-05-15', amountMinor: 100 }));
+    await repo.create(tx({ id: 'future', date: '2024-05-16', amountMinor: 50 }));
+    await repo.create(
+      tx({
+        id: 'futureIn',
+        kind: 'transfer',
+        date: '2024-05-20',
+        amountMinor: 7,
+        accountId: 'a2',
+        toAccountId: 'a1',
+        categoryId: null,
+      }),
+    );
+    expect(await repo.netForAccount('a1', '2024-05-15')).toBe(400);
+    expect(await repo.netForAccount('a1')).toBe(400 - 50 + 7);
+  });
+
+  it('leaves balance adjustments out of the uncategorized filter', async () => {
+    await repo.create(tx({ id: 'open', categoryId: null }));
+    await repo.create(tx({ id: 'adjust', categoryId: null, adjustment: true }));
+    const { items } = await repo.query({ limit: 10, uncategorized: true });
+    expect(items.map((t) => t.id)).toEqual(['open']);
+  });
+
   it('materializes occurrences with the rule clock and never rewrites existing ids', async () => {
     const rules = new IdbRecurringRuleRepository({ db: env.db, recorder: env.recorder });
     /** @type {RecurringRule} */

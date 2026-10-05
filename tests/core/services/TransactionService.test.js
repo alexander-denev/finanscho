@@ -177,4 +177,23 @@ describe('TransactionService', () => {
     await t.services.accounts.setArchived(other.id, true);
     expect((await t.services.transactions.defaults()).accountId).toBe(main.id);
   });
+
+  it('keeps a balance adjustment until it gets a category', async () => {
+    await t.services.accounts.reconcile(main.id, { balance: '-12' });
+    const [adjustment] = (await t.services.transactions.query({ limit: 10 })).items;
+    const input = {
+      kind: 'expense',
+      date: adjustment.date,
+      amount: '12',
+      accountId: main.id,
+      categoryId: null,
+      note: 'cash I forgot',
+    };
+    await t.services.transactions.update(adjustment.id, input);
+    expect((await t.services.transactions.get(adjustment.id)).adjustment).toBe(true);
+
+    await t.services.transactions.update(adjustment.id, { ...input, categoryId: 'seed:dining' });
+    const categorized = await t.services.transactions.get(adjustment.id);
+    expect(categorized).toMatchObject({ categoryId: 'seed:dining', adjustment: false });
+  });
 });

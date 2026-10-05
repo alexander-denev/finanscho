@@ -139,4 +139,47 @@ describe('AccountService', () => {
     const byName = Object.fromEntries(balances.map((b) => [b.account.name, b.balanceMinor]));
     expect(byName).toEqual({ Main: 10_000 + 100_000 - 2_550 - 4_000, Cash: 4_000 });
   });
+
+  it('reconciles with the counted balance through today, recording the difference', async () => {
+    const t = await createTestServices();
+    const main = await makeAccount(t, 'Main', '100');
+    const tx = t.services.transactions;
+    await tx.create({ kind: 'expense', date: '2024-05-10', amount: '20', accountId: main.id });
+    // Dated tomorrow: it hasn't happened yet, so it doesn't count when reconciling today.
+    await tx.create({ kind: 'expense', date: '2024-05-16', amount: '5', accountId: main.id });
+    expect(await t.services.accounts.balanceToday(main.id)).toBe(8_000);
+
+    expect(await t.services.accounts.reconcile(main.id, { balance: '75.50' })).toEqual({
+      differenceMinor: -450,
+    });
+    const { items } = await tx.query({ limit: 10, accountId: main.id });
+    expect(items.find((i) => i.adjustment)).toMatchObject({
+      kind: 'expense',
+      date: '2024-05-15',
+      amountMinor: 450,
+      categoryId: null,
+      adjustment: true,
+    });
+    expect(await t.services.accounts.balanceToday(main.id)).toBe(7_550);
+
+    expect(await t.services.accounts.reconcile(main.id, { balance: '75,5' })).toEqual({
+      differenceMinor: 0,
+    });
+    expect((await tx.query({ limit: 10, accountId: main.id })).items).toHaveLength(3);
+
+    expect(await t.services.accounts.reconcile(main.id, { balance: '-10' })).toEqual({
+      differenceMinor: -8_550,
+    });
+  });
+
+  it('rejects an invalid counted balance and unknown accounts when reconciling', async () => {
+    const t = await createTestServices();
+    const main = await makeAccount(t, 'Main');
+    expect(
+      await asyncFieldErrors(t.services.accounts.reconcile(main.id, { balance: 'x' })),
+    ).toEqual({ balance: 'validation.money.invalid' });
+    await expect(t.services.accounts.reconcile('nope', { balance: '1' })).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+  });
 });
