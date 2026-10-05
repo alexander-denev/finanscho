@@ -1,5 +1,6 @@
 import { useSignal, useSignalEffect } from '@preact/signals';
 import { toDecimalString } from '../../../core/domain/money.js';
+import { isAutomatic } from '../../../core/domain/transaction.js';
 import { useStores } from '../../context/StoresProvider.jsx';
 import { Button } from '../../components/Button.jsx';
 import { ConfirmDialog } from '../../components/ConfirmDialog.jsx';
@@ -10,6 +11,11 @@ import { TransactionForm } from './TransactionForm.jsx';
 
 /** @typedef {import('../../components/TransactionFields.jsx').TransactionDraft} TransactionDraft */
 /** @typedef {{ id: string | null }} TransactionDialogRequest id null = add */
+/**
+ * The automation that made the transaction being edited: `name` is null when it was deleted, and
+ * `id` is null for a transaction made by a recurring rule of an older app version.
+ * @typedef {{ id: string | null, name: string | null }} MadeBy
+ */
 
 /**
  * @typedef {object} TransactionDialogProps
@@ -43,7 +49,7 @@ function toInput(draft) {
  * @returns {import('preact').JSX.Element}
  */
 export function TransactionDialog({ request, onClose }) {
-  const { transactions, accounts, categories, toasts, router } = useStores();
+  const { transactions, automations, accounts, categories, toasts, router } = useStores();
   const initial = useSignal(/** @type {TransactionDraft | null} */ (null));
   const loadError = useSignal(/** @type {string | null} */ (null));
   const payeeSuggestions = useSignal(
@@ -51,6 +57,7 @@ export function TransactionDialog({ request, onClose }) {
   );
   const confirmDelete = useSignal(false);
   const isAdjustment = useSignal(false);
+  const madeBy = useSignal(/** @type {MadeBy | null} */ (null));
   const editingId = request.value?.id ?? null;
 
   // Reactive effect: prepare the draft whenever a new request arrives.
@@ -59,12 +66,19 @@ export function TransactionDialog({ request, onClose }) {
     initial.value = null;
     loadError.value = null;
     isAdjustment.value = false;
+    madeBy.value = null;
     if (!current) return;
     let cancelled = false;
     const load = async () => {
       if (current.id) {
         const tx = await transactions.get(current.id);
         if (!cancelled) isAdjustment.value = tx.adjustment === true;
+        if (isAutomatic(tx)) {
+          const automation = tx.automationId ? await automations.find(tx.automationId) : null;
+          if (!cancelled) {
+            madeBy.value = { id: automation?.id ?? null, name: automation?.name ?? null };
+          }
+        }
         const currency = accounts.byId.peek().get(tx.accountId)?.currency ?? 'EUR';
         return {
           kind: tx.kind,
@@ -129,6 +143,12 @@ export function TransactionDialog({ request, onClose }) {
     router.navigate('/accounts/new');
   };
 
+  /** @param {string} id */
+  const openAutomation = (id) => {
+    onClose();
+    router.navigate(`/automations/${encodeURIComponent(id)}`);
+  };
+
   const remove = async () => {
     confirmDelete.value = false;
     if (!editingId) return;
@@ -155,6 +175,20 @@ export function TransactionDialog({ request, onClose }) {
         {initial.value && isAdjustment.value && (
           <InlineMessage>{t('transactions.adjustmentNote')}</InlineMessage>
         )}
+        {initial.value && madeBy.value?.name && (
+          <InlineMessage
+            action={
+              <Button onClick={() => openAutomation(/** @type {string} */ (madeBy.value?.id))}>
+                {t('transactions.openAutomation')}
+              </Button>
+            }
+          >
+            {t('transactions.madeBy', { name: madeBy.value.name })}
+          </InlineMessage>
+        )}
+        {initial.value && madeBy.value?.id === null && madeBy.value.name === null && (
+          <InlineMessage>{t('transactions.madeByDeleted')}</InlineMessage>
+        )}
         {initial.value && (activeAccounts.length > 0 || editingId) && (
           <TransactionForm
             initial={initial.value}
@@ -176,7 +210,9 @@ export function TransactionDialog({ request, onClose }) {
       <ConfirmDialog
         open={open && confirmDelete.value}
         title={t('transactions.delete')}
-        message={t('transactions.deleteConfirm')}
+        message={
+          madeBy.value ? t('transactions.deleteAutomaticConfirm') : t('transactions.deleteConfirm')
+        }
         confirmLabel={t('transactions.delete')}
         danger
         onConfirm={() => void remove()}

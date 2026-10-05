@@ -67,4 +67,19 @@ describe('IdbBackupRepository', () => {
     expect((await accounts.get('a1'))?.name).toBe('Newer local name');
     expect(await target.db.get(STORES.accounts, 'bad')).toBeUndefined();
   });
+
+  it('imports a backup from before automations, leaving out its recurring rules', async () => {
+    const source = await createTestDb();
+    await new IdbAccountRepository(source).create(account);
+    const exported = await new IdbBackupRepository(source).exportAll();
+    const clock = Object.values(exported.accounts[0]._clocks)[0];
+    const old = {
+      ...exported,
+      recurringRules: [{ id: 'r1', frequency: 'monthly', _clocks: { frequency: clock } }],
+    };
+    const target = await createTestDb();
+    const backup = new IdbBackupRepository(target);
+    expect(await backup.importAll(old)).toBe(1);
+    expect(Object.keys(await backup.exportAll())).not.toContain('recurringRules');
+  });
 });

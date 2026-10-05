@@ -1,0 +1,26 @@
+.list {
+  border-top: var(--hairline) solid var(--c-rule);
+}
+
+.section {
+  margin-top: var(--sp-6);
+}
+
+.sectionTitle {
+  margin-bottom: var(--sp-2);
+  font-size: var(--fs-lg);
+}
+
+.extra {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  width: 100%;
+}
+
+.error {
+  width: 100%;
+  font-size: var(--fs-sm);
+  color: var(--c-brick);
+  font-weight: var(--fw-strong);
+}

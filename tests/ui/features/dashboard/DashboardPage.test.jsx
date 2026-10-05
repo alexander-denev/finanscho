@@ -48,18 +48,22 @@ describe('DashboardPage', () => {
       categoryId: 'seed:dining',
     });
     await ui.stores.budgets.setBudget('seed:dining', '100');
-    await ui.stores.recurring.create({
-      frequency: 'monthly',
-      interval: 1,
+    await ui.stores.automations.create({
+      name: 'Streaming',
       startDate: '2024-05-25',
-      endDate: null,
-      template: {
-        kind: 'expense',
-        amount: '12',
-        accountId: main.id,
-        categoryId: 'seed:subscriptions',
-        payee: 'Streaming',
-      },
+      triggers: [{ type: 'schedule', frequency: 'monthly', interval: 1, firstDate: '2024-05-25' }],
+      actions: [
+        {
+          type: 'createTransaction',
+          template: {
+            kind: 'expense',
+            accountId: main.id,
+            categoryId: 'seed:subscriptions',
+            payee: 'Streaming',
+          },
+          amount: { type: 'fixed', value: '12' },
+        },
+      ],
     });
     await ui.settled();
     renderWithStores(<DashboardPage />, ui.stores);

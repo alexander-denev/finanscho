@@ -282,4 +282,31 @@ describe('ChangeRecorder', () => {
     expect((await db.get(STORES.accounts, 'a')).name).toBe('A');
     expect(await db.get(STORES.meta, META_KEYS.deferredOps)).toEqual([]);
   });
+
+  it('drops ops of retired entities on arrival and from the deferred list', async () => {
+    const { db, recorder } = await createTestDb();
+    const hlc = HybridLogicalClock.format({ wallMs: 5, counter: 0, deviceId: 'r' });
+    const oldRule = {
+      v: 1,
+      deviceId: 'r',
+      seq: 1,
+      hlc,
+      entity: 'recurringRules',
+      id: 'rule',
+      fields: { frequency: 'monthly' },
+      origin: 'user',
+    };
+    const result = await recorder.applyRemote(/** @type {any} */ ([oldRule]), {
+      deviceId: 'r',
+      lastSeq: 1,
+    });
+    expect(result).toEqual({ changed: [], deferred: 0 });
+    expect(await db.get(STORES.meta, META_KEYS.deferredOps)).toBeUndefined();
+    expect(await db.get(STORES.syncCursors, 'r')).toEqual({ deviceId: 'r', lastSeq: 1 });
+
+    // Deferred by a build that didn't know the entity was retired.
+    await db.put(STORES.meta, [{ ...oldRule, seq: 2 }], META_KEYS.deferredOps);
+    expect(await recorder.replayDeferred()).toEqual([]);
+    expect(await db.get(STORES.meta, META_KEYS.deferredOps)).toEqual([]);
+  });
 });

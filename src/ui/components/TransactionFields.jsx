@@ -9,7 +9,8 @@ import { TextField } from './TextField.jsx';
 import styles from './TransactionFields.module.css';
 
 /**
- * Form draft for a transaction or a recurring template. All values are strings as typed.
+ * Form draft for a transaction or an automation's transaction template. All values are strings
+ * as typed.
  * @typedef {object} TransactionDraft
  * @property {string} kind 'expense' | 'income' | 'transfer'
  * @property {string} amount
@@ -29,6 +30,9 @@ import styles from './TransactionFields.module.css';
  * @property {readonly { id: string, name: string, currency: string }[]} accounts
  * @property {readonly { id: string, name: string, kind: string }[]} categories
  * @property {boolean} [showDate]
+ * @property {boolean} [showAmount] false when the amount is entered elsewhere (automation steps)
+ * @property {{ payee?: import('preact').ComponentChildren, note?: import('preact').ComponentChildren }} [addons]
+ *   shown right under the payee or note field (help for automation fill-in words)
  * @property {readonly PayeeSuggestion[]} [payeeSuggestions] most recent first
  * @property {boolean} [autofillAccount] whether a known payee may also set the account (new entries)
  */
@@ -53,7 +57,7 @@ function payeeKey(payee) {
 const KIND_OPTIONS = ['expense', 'income', 'transfer'];
 
 /**
- * The fields shared by the transaction form and the recurring form: amount first (focused when
+ * The fields shared by the transaction form and automation steps: amount first (focused when
  * the dialog opens, decimal keyboard), then type and payee, then category, account, and date, then
  * the note. The payee suggests earlier payees; choosing one fills an empty category (and its type)
  * and, when `autofillAccount` is set and the user hasn't picked one, the account.
@@ -67,6 +71,8 @@ export function TransactionFields({
   accounts,
   categories,
   showDate = true,
+  showAmount = true,
+  addons = {},
   payeeSuggestions = [],
   autofillAccount = false,
 }) {
@@ -106,15 +112,17 @@ export function TransactionFields({
 
   return (
     <div className={styles.root}>
-      <MoneyInput
-        label={t('transactions.amount')}
-        value={value.amount}
-        currency={currency}
-        error={error('amount')}
-        required
-        initialFocus
-        onInput={(amount) => onChange({ amount })}
-      />
+      {showAmount && (
+        <MoneyInput
+          label={t('transactions.amount')}
+          value={value.amount}
+          currency={currency}
+          error={error('amount')}
+          required
+          initialFocus
+          onInput={(amount) => onChange({ amount })}
+        />
+      )}
       <SegmentedControl
         legend={t('transactions.kind')}
         value={value.kind}
@@ -135,6 +143,7 @@ export function TransactionFields({
         }))}
         onInput={changePayee}
       />
+      {addons.payee}
       {!isTransfer && (
         <Select
           label={t('common.optional', { label: t('transactions.category') })}
@@ -186,6 +195,7 @@ export function TransactionFields({
         autoComplete="off"
         onInput={(note) => onChange({ note })}
       />
+      {addons.note}
     </div>
   );
 }

@@ -1,0 +1,21 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.budgets {
+  border-top: var(--hairline) solid var(--c-rule);
+}
+
+.budget {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-1);
+  border-bottom: var(--hairline) solid var(--c-rule);
+}
+
+.amount {
+  font-variant-numeric: tabular-nums;
+}

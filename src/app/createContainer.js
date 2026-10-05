@@ -9,7 +9,7 @@ import { IdbAccountRepository } from '../infrastructure/db/repositories/IdbAccou
 import { IdbCategoryRepository } from '../infrastructure/db/repositories/IdbCategoryRepository.js';
 import { IdbTransactionRepository } from '../infrastructure/db/repositories/IdbTransactionRepository.js';
 import { IdbBudgetRepository } from '../infrastructure/db/repositories/IdbBudgetRepository.js';
-import { IdbRecurringRuleRepository } from '../infrastructure/db/repositories/IdbRecurringRuleRepository.js';
+import { IdbAutomationRepository } from '../infrastructure/db/repositories/IdbAutomationRepository.js';
 import { IdbSettingsRepository } from '../infrastructure/db/repositories/IdbSettingsRepository.js';
 import { IdbDeviceRepository } from '../infrastructure/db/repositories/IdbDeviceRepository.js';
 import { IdbBackupRepository } from '../infrastructure/db/repositories/IdbBackupRepository.js';
@@ -30,7 +30,7 @@ import { AccountService } from '../core/services/AccountService.js';
 import { CategoryService } from '../core/services/CategoryService.js';
 import { TransactionService } from '../core/services/TransactionService.js';
 import { BudgetService } from '../core/services/BudgetService.js';
-import { RecurringService } from '../core/services/RecurringService.js';
+import { AutomationService } from '../core/services/AutomationService.js';
 import { DashboardService } from '../core/services/DashboardService.js';
 import { BackupService } from '../core/services/BackupService.js';
 import { SettingsService } from '../core/services/SettingsService.js';
@@ -38,7 +38,7 @@ import { AccountsStore } from '../state/AccountsStore.js';
 import { CategoriesStore } from '../state/CategoriesStore.js';
 import { TransactionsStore } from '../state/TransactionsStore.js';
 import { BudgetsStore } from '../state/BudgetsStore.js';
-import { RecurringStore } from '../state/RecurringStore.js';
+import { AutomationsStore } from '../state/AutomationsStore.js';
 import { DashboardStore } from '../state/DashboardStore.js';
 import { SettingsStore } from '../state/SettingsStore.js';
 import { SyncStore } from '../state/SyncStore.js';
@@ -46,6 +46,7 @@ import { ToastStore } from '../state/ToastStore.js';
 import { InstallStore } from '../state/InstallStore.js';
 import { createHistoryRouter } from '../ui/router/historyRouter.js';
 import { t } from '../ui/i18n/i18n.js';
+import { runAutomationsOnChange } from './runAutomationsOnChange.js';
 import { bindStoreInvalidation } from './storeInvalidation.js';
 
 /**
@@ -84,7 +85,7 @@ export async function createContainer({ window, registerServiceWorker }) {
     categories: new IdbCategoryRepository({ db, recorder }),
     transactions: new IdbTransactionRepository({ db, recorder }),
     budgets: new IdbBudgetRepository({ db, recorder }),
-    rules: new IdbRecurringRuleRepository({ db, recorder }),
+    automations: new IdbAutomationRepository({ db, recorder }),
     settings: new IdbSettingsRepository({ db }),
   };
 
@@ -92,11 +93,11 @@ export async function createContainer({ window, registerServiceWorker }) {
   const categoryService = new CategoryService({ ...repos, clock, ids });
   const transactionService = new TransactionService({ ...repos, clock, ids });
   const budgetService = new BudgetService({ ...repos, clock });
-  const recurringService = new RecurringService({ ...repos, clock, ids });
+  const automationService = new AutomationService({ ...repos, clock, ids });
   const dashboardService = new DashboardService({
     accounts: accountService,
     budgets: budgetService,
-    recurring: recurringService,
+    automations: automationService,
     transactions: repos.transactions,
     clock,
   });
@@ -106,13 +107,12 @@ export async function createContainer({ window, registerServiceWorker }) {
   });
   const settingsService = new SettingsService({ settings: repos.settings, device, clock });
 
-  // Startup data work: replay ops deferred by an older version, seed defaults, catch up recurring,
-  // and shrink old tombstones to stubs (local only, D40).
+  // Startup data work: replay ops deferred by an older version, seed defaults, make what
+  // automations owe since the app last ran, and shrink old tombstones to stubs (local only, D40).
   await recorder.replayDeferred();
   await recorder.pruneTombstones(clock.nowMs());
   await categoryService.seedDefaults();
-  await recurringService.materialize();
-  await budgetService.materialize();
+  await automationService.run();
 
   // Sync over fetch; the WebDAV server must allow CORS (see docs/SYNC_PROTOCOL.md §8).
   const http = new FetchHttpAdapter();
@@ -133,11 +133,14 @@ export async function createContainer({ window, registerServiceWorker }) {
         transport: createClient(credentials),
         deviceId,
         getDeviceName: () => device.getDeviceName(),
-        afterPull: async () => {
+        afterPull: async (changed) => {
           await accountService.restoreUsed();
           await categoryService.restoreUsed();
-          await recurringService.materialize();
-          await budgetService.materialize();
+          // Schedules always run; "a transaction is recorded" only when something it reacts to
+          // arrived.
+          await automationService.run({
+            events: changed.has('transactions') || changed.has('automations'),
+          });
         },
         changeFeed,
         nowIso: () => clock.nowIso(),
@@ -154,7 +157,7 @@ export async function createContainer({ window, registerServiceWorker }) {
     categories: new CategoriesStore({ categoryService }),
     transactions,
     budgets: new BudgetsStore({ budgetService, clock }),
-    recurring: new RecurringStore({ recurringService }),
+    automations: new AutomationsStore({ automationService }),
     dashboard: new DashboardStore({ dashboardService }),
     settings: new SettingsStore({ settingsService, backupService }),
     sync: new SyncStore({ syncControl: scheduler }),
@@ -175,7 +178,7 @@ export async function createContainer({ window, registerServiceWorker }) {
     { store: stores.categories, dependsOn: CategoriesStore.DEPENDS_ON },
     { store: stores.transactions, dependsOn: TransactionsStore.DEPENDS_ON },
     { store: stores.budgets, dependsOn: BudgetsStore.DEPENDS_ON },
-    { store: stores.recurring, dependsOn: RecurringStore.DEPENDS_ON },
+    { store: stores.automations, dependsOn: AutomationsStore.DEPENDS_ON },
     { store: stores.dashboard, dependsOn: DashboardStore.DEPENDS_ON },
   ]);
 
@@ -184,16 +187,18 @@ export async function createContainer({ window, registerServiceWorker }) {
     stores.categories.load(),
     stores.transactions.load(),
     stores.budgets.load(),
-    stores.recurring.load(),
+    stores.automations.load(),
     stores.dashboard.load(),
     stores.settings.load(),
     stores.sync.load(),
     stores.install.load(),
   ]);
 
+  const stopAutomationRuns = runAutomationsOnChange(changeFeed, () => automationService.run());
   const cancelMidnight = onLocalMidnight(() => {
-    void stores.recurring.materialize();
-    void stores.budgets.materialize();
+    // A failed run changes nothing; the next change or pull runs again.
+    automationService.run().catch(() => {});
+    void stores.automations.invalidate();
     void stores.budgets.invalidate();
     void stores.dashboard.invalidate();
   });
@@ -220,6 +225,7 @@ export async function createContainer({ window, registerServiceWorker }) {
       stopServiceWorker();
       scheduler.stop();
       cancelMidnight();
+      stopAutomationRuns();
       unbind();
       stores.sync.dispose();
       stores.install.dispose();

@@ -10,7 +10,8 @@
 /** @typedef {import('../domain/category.js').CategoryKind} CategoryKind */
 /** @typedef {import('../domain/transaction.js').Transaction} Transaction */
 /** @typedef {import('../domain/budget.js').Budget} Budget */
-/** @typedef {import('../domain/recurringRule.js').RecurringRule} RecurringRule */
+/** @typedef {import('../domain/automation.js').Automation} Automation */
+/** @typedef {import('../domain/automation.js').AutomationResult} AutomationResult */
 /** @typedef {import('../domain/localDate.js').LocalDate} LocalDate */
 /** @typedef {import('../domain/localDate.js').YearMonth} YearMonth */
 
@@ -60,7 +61,7 @@
  * @typedef {object} TransactionRepository
  * @property {(id: string) => Promise<Transaction | null>} get
  * @property {(query: TransactionQuery) => Promise<{ items: Transaction[], hasMore: boolean }>} query newest first
- * @property {(from: LocalDate, to: LocalDate) => Promise<Transaction[]>} listInRange inclusive; use only for bounded ranges (a month)
+ * @property {(from: LocalDate, to: LocalDate) => Promise<Transaction[]>} listInRange inclusive, visible only; reads the whole range at once
  * @property {(accountId: string, through?: LocalDate) => Promise<number>} netForAccount signed sum of all effects on the account; with `through`, only of transactions dated on or before that day
  * @property {(accountId: string) => Promise<boolean>} hasAnyForAccount whether a visible transaction uses the account on either side
  * @property {(categoryId: string) => Promise<boolean>} hasAnyForCategory whether a visible transaction uses the category
@@ -69,14 +70,8 @@
  * @property {(id: string, changes: Partial<Transaction>) => Promise<void>} update
  * @property {(id: string, updatedAt: string) => Promise<void>} remove
  * @property {(categoryId: string, month: YearMonth) => Promise<Transaction[]>} listForCategoryInMonth uses the [categoryId+date] index
- * @property {(ruleId: string) => Promise<Set<string>>} occurrenceIdsForRule IDs of the rule's occurrences in any state (including deleted and tombstone stubs)
- * @property {(ruleId: string, occurrences: Transaction[]) => Promise<number>} materialize writes occurrences whose IDs do not exist in any state, with the rule's creation clock; returns how many were written
- */
-
-/**
- * The newest budget record of a category up to some month, in any state. `budget` is null when
- * that record is deleted (or not fully created yet).
- * @typedef {{ month: YearMonth, budget: Budget | null }} LatestBudget
+ * @property {(prefix: string) => Promise<Set<string>>} idsWithPrefix IDs starting with `prefix`, in any state (including deleted and tombstone stubs)
+ * @property {(prefix: string) => Promise<Transaction[]>} listWithPrefix visible transactions whose ID starts with `prefix`
  */
 
 /**
@@ -85,18 +80,18 @@
  * @property {(id: string) => Promise<Budget | null>} get
  * @property {(budget: Budget) => Promise<void>} put creates or replaces all fields (deterministic id)
  * @property {(id: string, updatedAt: string) => Promise<void>} remove
- * @property {(throughMonth: YearMonth) => Promise<Map<string, LatestBudget>>} latestPerCategory by category ID, including deleted records
- * @property {(sourceId: string, months: YearMonth[]) => Promise<number>} copyRecurring copies a visible recurring budget into `months` (ascending) with the source's clock, stopping at the first month that has a record in any state; returns how many were written
+ * @property {() => Promise<Set<string>>} allIds every budget ID in any state (including deleted and tombstone stubs)
+ * @property {(automationId: string) => Promise<Budget[]>} listByAutomation visible budgets whose `automationId` is this automation
  */
 
 /**
- * @typedef {object} RecurringRuleRepository
- * @property {() => Promise<RecurringRule[]>} list
- * @property {(id: string) => Promise<RecurringRule | null>} get
- * @property {(rule: RecurringRule) => Promise<void>} create
- * @property {(id: string, endDate: LocalDate | null, updatedAt: string) => Promise<void>} setEndDate
- * @property {(id: string, endDate: LocalDate | null, skippedOccurrenceIds: string[], updatedAt: string) => Promise<void>} reopen in one transaction: deletes the skipped occurrences that don't exist yet (so no device creates them), then sets the end date
+ * @typedef {object} AutomationRepository
+ * @property {() => Promise<Automation[]>} list sorted by name
+ * @property {(id: string) => Promise<Automation | null>} get
+ * @property {(automation: Automation) => Promise<void>} create
+ * @property {(id: string, changes: Partial<Automation>) => Promise<void>} update writes only the given fields
  * @property {(id: string, updatedAt: string) => Promise<void>} remove
+ * @property {(automationId: string, results: AutomationResult[]) => Promise<number>} writeResults in one transaction, writes the results whose IDs don't exist in any state, with clocks every device derives the same way (docs/DECISIONS.md, D51); returns how many were written
  */
 
 /**

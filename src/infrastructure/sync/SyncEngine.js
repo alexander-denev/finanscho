@@ -92,11 +92,12 @@ export class SyncEngine {
    *   transport: SyncTransport,
    *   deviceId: string,
    *   getDeviceName: () => Promise<string>,
-   *   afterPull: () => Promise<void>,
+   *   afterPull: (changed: ReadonlySet<EntityName>) => Promise<void>,
    *   changeFeed: ChangeFeed,
    *   nowIso: () => string,
    *   compactMinOps?: number,
-   * }} deps `compactMinOps` overrides COMPACT_MIN_OPS (tests)
+   * }} deps `afterPull` runs after every pull with the entities it changed (possibly none);
+   *   `compactMinOps` overrides COMPACT_MIN_OPS (tests)
    */
   constructor({
     db,
@@ -391,7 +392,7 @@ export class SyncEngine {
       }
     }
 
-    await this.#afterPull();
+    await this.#afterPull(changed);
     if (changed.size > 0) this.#changeFeed.publish({ entities: [...changed], source: 'remote' });
     return { pulled, deferred, issues };
   }

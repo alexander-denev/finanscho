@@ -2,7 +2,7 @@ import { IdbAccountRepository } from '../../src/infrastructure/db/repositories/I
 import { IdbCategoryRepository } from '../../src/infrastructure/db/repositories/IdbCategoryRepository.js';
 import { IdbTransactionRepository } from '../../src/infrastructure/db/repositories/IdbTransactionRepository.js';
 import { IdbBudgetRepository } from '../../src/infrastructure/db/repositories/IdbBudgetRepository.js';
-import { IdbRecurringRuleRepository } from '../../src/infrastructure/db/repositories/IdbRecurringRuleRepository.js';
+import { IdbAutomationRepository } from '../../src/infrastructure/db/repositories/IdbAutomationRepository.js';
 import { IdbSettingsRepository } from '../../src/infrastructure/db/repositories/IdbSettingsRepository.js';
 import { IdbDeviceRepository } from '../../src/infrastructure/db/repositories/IdbDeviceRepository.js';
 import { IdbBackupRepository } from '../../src/infrastructure/db/repositories/IdbBackupRepository.js';
@@ -10,7 +10,7 @@ import { AccountService } from '../../src/core/services/AccountService.js';
 import { CategoryService } from '../../src/core/services/CategoryService.js';
 import { TransactionService } from '../../src/core/services/TransactionService.js';
 import { BudgetService } from '../../src/core/services/BudgetService.js';
-import { RecurringService } from '../../src/core/services/RecurringService.js';
+import { AutomationService } from '../../src/core/services/AutomationService.js';
 import { DashboardService } from '../../src/core/services/DashboardService.js';
 import { BackupService } from '../../src/core/services/BackupService.js';
 import { SettingsService } from '../../src/core/services/SettingsService.js';
@@ -30,7 +30,7 @@ export async function createTestServices(options = {}) {
     categories: new IdbCategoryRepository({ db, recorder }),
     transactions: new IdbTransactionRepository({ db, recorder }),
     budgets: new IdbBudgetRepository({ db, recorder }),
-    rules: new IdbRecurringRuleRepository({ db, recorder }),
+    automations: new IdbAutomationRepository({ db, recorder }),
     settings: new IdbSettingsRepository({ db }),
     device: new IdbDeviceRepository({ db, newId: () => ids.newId() }),
     backup: new IdbBackupRepository({ db, recorder }),
@@ -39,11 +39,11 @@ export async function createTestServices(options = {}) {
   const categories = new CategoryService({ ...repos, clock, ids });
   const transactions = new TransactionService({ ...repos, clock, ids });
   const budgets = new BudgetService({ ...repos, clock });
-  const recurring = new RecurringService({ ...repos, clock, ids });
+  const automations = new AutomationService({ ...repos, clock, ids });
   const dashboard = new DashboardService({
     accounts,
     budgets,
-    recurring,
+    automations,
     transactions: repos.transactions,
     clock,
   });
@@ -58,7 +58,7 @@ export async function createTestServices(options = {}) {
       categories,
       transactions,
       budgets,
-      recurring,
+      automations,
       dashboard,
       backup,
       settings,

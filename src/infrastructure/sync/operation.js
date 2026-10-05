@@ -13,11 +13,22 @@ export const SYNCED_ENTITIES = /** @type {const} */ ([
   'categories',
   'transactions',
   'budgets',
-  'recurringRules',
+  'automations',
 ]);
 
+/**
+ * Entities that were synced by older app versions and no longer exist. Their ops are dropped on
+ * arrival instead of being kept for replay (docs/DECISIONS.md, D50): no future version will apply
+ * them, and kept ops would shut the device out of the checkpoint frontier for good.
+ */
+export const RETIRED_ENTITIES = /** @type {const} */ (['recurringRules']);
+
 /** @typedef {(typeof SYNCED_ENTITIES)[number]} EntityName */
-/** @typedef {'user' | 'recurrence'} OpOrigin */
+/**
+ * Who made an op: the user, an automation, or (in older app versions) a recurring rule or
+ * recurring budget. Informational only; clients accept any string.
+ * @typedef {'user' | 'automation' | 'recurrence'} OpOrigin
+ */
 
 /**
  * @typedef {object} Op
@@ -74,6 +85,15 @@ export function validateOp(value) {
   if ('id' in fields || '_clocks' in fields) return 'reserved field';
   if (typeof origin !== 'string') return 'bad origin';
   return null;
+}
+
+/**
+ * Whether the op belongs to an entity that no longer exists.
+ * @param {Op} op
+ * @returns {boolean}
+ */
+export function isRetiredOp(op) {
+  return /** @type {readonly string[]} */ (RETIRED_ENTITIES).includes(op.entity);
 }
 
 /**

@@ -26,8 +26,70 @@ async function expectConverged(devices, options = {}) {
   for (const list of lists.slice(1)) expect(list).toBe(lists[0]);
 }
 
+/**
+ * A monthly expense automation.
+ * @param {string} accountId
+ * @param {string} firstDate
+ * @param {string} [amount]
+ * @returns {import('../../../src/core/domain/automation.js').AutomationInput}
+ */
+const monthly = (accountId, firstDate, amount = '800') => ({
+  name: 'Rent',
+  startDate: firstDate,
+  triggers: [{ type: 'schedule', frequency: 'monthly', interval: 1, firstDate }],
+  actions: [
+    {
+      type: 'createTransaction',
+      template: { kind: 'expense', accountId, categoryId: 'seed:housing', payee: 'Rent' },
+      amount: { type: 'fixed', value: amount },
+    },
+  ],
+});
+
+/**
+ * Moves a share of every income in `from` to `to`.
+ * @param {string} from
+ * @param {string} to
+ * @param {string} percent
+ * @returns {import('../../../src/core/domain/automation.js').AutomationInput}
+ */
+const saveShare = (from, to, percent) => ({
+  name: 'Save',
+  startDate: '2024-05-01',
+  triggers: [{ type: 'transactionRecorded' }],
+  conditions: {
+    match: 'all',
+    items: [
+      { field: 'kind', op: 'is', kind: 'income' },
+      { field: 'account', op: 'is', accountId: from },
+    ],
+  },
+  actions: [
+    {
+      type: 'createTransaction',
+      template: { kind: 'transfer', accountId: from, toAccountId: to },
+      amount: { type: 'percent', value: percent },
+    },
+  ],
+});
+
+/**
+ * @param {Device} device
+ * @param {string} name
+ * @returns {Promise<string>}
+ */
+const account = async (device, name) =>
+  (
+    await device.services.accounts.create({
+      name,
+      type: 'checking',
+      currency: 'EUR',
+      openingBalance: '0',
+    })
+  ).id;
+
 describe('multi-device sync convergence', () => {
-  it('converges after offline edits, deletes, and independent recurring materialization', async () => {
+  it('converges after offline edits, deletes, and independent automation runs', async () => {
     const server = new InMemoryWebDav();
     const a = await createDevice(server, 'A', { clockIso: '2024-05-15T10:00:00.000Z' });
     // B's clock runs an hour behind; C is 30 minutes ahead. HLCs absorb the skew.
@@ -40,30 +102,18 @@ describe('multi-device sync convergence', () => {
       currency: 'EUR',
       openingBalance: '500',
     });
-    const rule = await a.services.recurring.create({
-      frequency: 'monthly',
-      interval: 1,
-      startDate: '2024-03-10',
-      endDate: null,
-      template: {
-        kind: 'expense',
-        amount: '800',
-        accountId: joint.id,
-        categoryId: 'seed:housing',
-        payee: 'Rent',
-      },
-    });
+    const rent = await a.services.automations.create(monthly(joint.id, '2024-03-10'));
     await a.sync();
     await b.sync();
     await c.sync();
 
-    // A month passes. B and C each materialize June's rent independently, offline.
+    // A month passes. B and C each make June's rent independently, offline.
     for (const d of [a, b, c]) d.clock.advanceDays(31);
-    expect(await b.services.recurring.materialize()).toBe(1);
-    expect(await c.services.recurring.materialize()).toBe(1);
+    expect(await b.services.automations.run()).toBe(1);
+    expect(await c.services.automations.run()).toBe(1);
 
     // Conflicting offline edits.
-    const aprilRent = `${rule.id}:2024-04-10`;
+    const aprilRent = `${rent.id}:t0:a0:2024-04-10`;
     await b.services.transactions.remove(aprilRent);
     const april = await a.services.transactions.get(aprilRent);
     a.clock.advance(60_000);
@@ -107,7 +157,7 @@ describe('multi-device sync convergence', () => {
 
     // The delete and the note edit touch different fields: the tombstone hides the record.
     expect(await a.services.transactions.get(aprilRent).catch(() => null)).toBeNull();
-    const juneRent = await b.services.transactions.get(`${rule.id}:2024-06-10`);
+    const juneRent = await b.services.transactions.get(`${rent.id}:t0:a0:2024-06-10`);
     expect(juneRent.amountMinor).toBe(80_000);
     const food = (await a.services.categories.list({ includeArchived: true })).find(
       (x) => x.id === 'seed:groceries',
@@ -149,68 +199,118 @@ describe('multi-device sync convergence', () => {
     }
   });
 
-  it('carries recurring budgets forward on every device, and a user edit beats the copies', async () => {
+  it('sets the same budget once on every device, and a user edit beats it', async () => {
     const server = new InMemoryWebDav();
     const a = await createDevice(server, 'A');
     const b = await createDevice(server, 'B');
-    await a.services.budgets.set({
-      categoryId: 'seed:groceries',
-      month: '2024-05',
-      limit: '300',
-      recurring: true,
+    const groceries = await a.services.automations.create({
+      name: 'Groceries',
+      startDate: '2024-05-01',
+      triggers: [{ type: 'schedule', frequency: 'monthly', interval: 1, firstDate: '2024-05-01' }],
+      actions: [
+        {
+          type: 'setBudget',
+          categoryId: 'seed:groceries',
+          amount: { type: 'fixed', value: '300' },
+        },
+      ],
     });
     await a.sync();
     await b.sync();
 
-    // June arrives. Both copy May's budget offline; then A changes June's limit.
+    // June arrives. Both set June's budget offline; then A changes June's limit by hand.
     for (const d of [a, b]) d.clock.set('2024-06-01T07:00:00.000Z');
-    expect(await a.services.budgets.materialize()).toBe(1);
-    expect(await b.services.budgets.materialize()).toBe(1);
+    expect(await a.services.automations.run()).toBe(1);
+    expect(await b.services.automations.run()).toBe(1);
     a.clock.advance(60_000);
-    await a.services.budgets.set({
-      categoryId: 'seed:groceries',
-      month: '2024-06',
-      limit: '320',
-      recurring: true,
-    });
+    await a.services.budgets.set({ categoryId: 'seed:groceries', month: '2024-06', limit: '320' });
     await syncUntilQuiet([b, a]);
     await expectConverged([a, b]);
     const [june] = (await b.services.budgets.forMonth('2024-06')).lines;
-    expect(june.budget).toMatchObject({ limitMinor: 32_000, recurring: true });
+    expect(june.budget).toMatchObject({ limitMinor: 32_000, automationId: null });
+    const [may] = (await b.services.budgets.forMonth('2024-05')).lines;
+    expect(may.budget).toMatchObject({ limitMinor: 30_000, automationId: groceries.id });
   });
 
-  it('never creates the dates a resumed rule skipped, on any device', async () => {
+  it('never fills the days an automation was stopped, on any device', async () => {
     const server = new InMemoryWebDav();
     const a = await createDevice(server, 'A');
     const b = await createDevice(server, 'B');
-    const main = await a.services.accounts.create({
-      name: 'Main',
-      type: 'checking',
-      currency: 'EUR',
-      openingBalance: '0',
-    });
-    const rule = await a.services.recurring.create({
-      frequency: 'monthly',
-      interval: 1,
-      startDate: '2024-05-01',
-      endDate: null,
-      template: { kind: 'expense', amount: '10', accountId: main.id, categoryId: null },
-    });
-    await a.services.recurring.stop(rule.id);
+    const main = await account(a, 'Main');
+    const rent = await a.services.automations.create(monthly(main, '2024-05-01', '10'));
+    await a.services.automations.stop(rent.id);
     await a.sync();
     await b.sync();
 
     for (const d of [a, b]) d.clock.set('2024-08-20T07:00:00.000Z');
-    expect(await a.services.recurring.resume(rule.id)).toBe('2024-09-01');
+    await a.services.automations.resume(rent.id);
     await a.sync();
     await b.sync();
     for (const d of [a, b]) d.clock.set('2024-09-02T07:00:00.000Z');
-    await b.services.recurring.materialize();
+    await b.services.automations.run();
     await syncUntilQuiet([a, b]);
     await expectConverged([a, b]);
     const dates = (await a.services.transactions.query({ limit: 50 })).items.map((x) => x.date);
     expect(dates).toEqual(['2024-09-01', '2024-05-01']);
-    expect((await b.services.recurring.list()).map((s) => s.rule.id)).toEqual([rule.id]);
+    expect((await b.services.automations.list()).map((x) => x.automation.id)).toEqual([rent.id]);
+  });
+
+  it('makes one transfer when two devices react to the same income', async () => {
+    const server = new InMemoryWebDav();
+    const a = await createDevice(server, 'A');
+    const b = await createDevice(server, 'B');
+    const checking = await account(a, 'Checking');
+    const savings = await account(a, 'Savings');
+    await a.services.automations.create(saveShare(checking, savings, '10'));
+    await a.sync();
+    await b.sync();
+
+    // B records a salary and pushes it before reacting; A then reacts to it too.
+    await b.services.transactions.create({
+      kind: 'income',
+      date: '2024-05-15',
+      amount: '2000',
+      accountId: checking,
+    });
+    await b.sync();
+    expect(await b.services.automations.run()).toBe(1);
+    await a.sync();
+    await syncUntilQuiet([a, b]);
+    await expectConverged([a, b]);
+    const transfers = (await a.services.transactions.query({ limit: 50 })).items.filter(
+      (x) => x.kind === 'transfer',
+    );
+    expect(transfers.map((x) => x.amountMinor)).toEqual([20_000]);
+  });
+
+  it('lets the edited version win when an offline device still runs the old one', async () => {
+    const server = new InMemoryWebDav();
+    const a = await createDevice(server, 'A');
+    const b = await createDevice(server, 'B');
+    const checking = await account(a, 'Checking');
+    const savings = await account(a, 'Savings');
+    const save = await a.services.automations.create(saveShare(checking, savings, '10'));
+    await a.sync();
+    await b.sync();
+
+    // A raises the share to 20% (not synced yet). B records a salary, pushes it, and reacts with
+    // the 10% it knows. A then sees the salary and reacts with 20%: same result ID, newer clock.
+    a.clock.advance(60_000);
+    await a.services.automations.edit(save.id, saveShare(checking, savings, '20'));
+    b.clock.advance(120_000);
+    const salary = await b.services.transactions.create({
+      kind: 'income',
+      date: '2024-05-15',
+      amount: '2000',
+      accountId: checking,
+    });
+    await b.sync();
+    expect(await b.services.automations.run()).toBe(1);
+    await a.sync();
+    await syncUntilQuiet([a, b]);
+    await expectConverged([a, b]);
+    const transfer = await b.services.transactions.get(`${save.id}:a0:${salary.id}`);
+    expect(transfer.amountMinor).toBe(40_000);
   });
 
   it('converges for randomized histories, sync orders, compaction, and pruning (property)', async () => {
@@ -272,18 +372,45 @@ describe('multi-device sync convergence', () => {
             });
           }
         } else if (action === 6 && rnd.next() < 0.3) {
-          await d.services.recurring.create({
-            frequency: rnd.pick(['daily', 'weekly', 'monthly']),
-            interval: 1 + rnd.int(3),
+          const onRecorded = rnd.next() < 0.5;
+          await d.services.automations.create({
+            name: `auto ${d.name}`,
             startDate: '2024-04-20',
-            endDate: null,
-            template: {
-              kind: 'expense',
-              amount: '10',
-              accountId: shared.id,
-              categoryId: rnd.pick(categories),
-            },
+            triggers: onRecorded
+              ? [{ type: 'transactionRecorded' }]
+              : [
+                  {
+                    type: 'schedule',
+                    frequency: rnd.pick(['daily', 'weekly', 'monthly']),
+                    interval: 1 + rnd.int(3),
+                    firstDate: '2024-04-20',
+                    weekend: rnd.pick(['keep', 'before', 'after']),
+                  },
+                ],
+            conditions: onRecorded
+              ? {
+                  match: 'any',
+                  items: [{ field: 'category', op: 'is', categoryId: rnd.pick(categories) }],
+                }
+              : null,
+            actions: [
+              {
+                type: 'createTransaction',
+                template: { kind: 'income', accountId: shared.id, note: '{payee}{month}' },
+                amount: onRecorded
+                  ? { type: 'percent', value: String(1 + rnd.int(50)) }
+                  : { type: 'fixed', value: '10' },
+              },
+            ],
           });
+        } else if (action === 6) {
+          const all = await d.services.automations.list();
+          if (all.length > 0) {
+            const target = rnd.pick(all).automation.id;
+            await (rnd.next() < 0.5
+              ? d.services.automations.stop(target)
+              : d.services.automations.resume(target));
+          }
         } else if (action === 7) {
           d.clock.advance(rnd.int(3) * 3_600_000 + rnd.int(60_000));
         } else if (action === 8 && rnd.next() < 0.3) {
@@ -313,7 +440,7 @@ describe('multi-device sync convergence', () => {
       await syncUntilQuiet(devices);
       await expectConverged(devices, { stubs: true });
       // A device joining now bootstraps from checkpoints and frontiers and sees the same data.
-      // Same day as the latest device, so it materializes no recurring occurrence the others lack.
+      // Same day as the latest device, so its automations make nothing the others lack.
       const clockIso = devices
         .map((d) => d.clock.nowIso())
         .sort()

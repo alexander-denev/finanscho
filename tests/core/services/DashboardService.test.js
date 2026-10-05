@@ -45,17 +45,17 @@ describe('DashboardService', () => {
       categoryId: 'seed:dining',
     });
     await t.services.budgets.set({ categoryId: 'seed:groceries', month: '2024-05', limit: '100' });
-    await t.services.recurring.create({
-      frequency: 'monthly',
-      interval: 1,
+    await t.services.automations.create({
+      name: 'Stream',
       startDate: '2024-05-20',
-      endDate: null,
-      template: {
-        kind: 'expense',
-        amount: '30',
-        accountId: main.id,
-        categoryId: 'seed:subscriptions',
-      },
+      triggers: [{ type: 'schedule', frequency: 'monthly', interval: 1, firstDate: '2024-05-20' }],
+      actions: [
+        {
+          type: 'createTransaction',
+          template: { kind: 'expense', accountId: main.id, categoryId: 'seed:subscriptions' },
+          amount: { type: 'fixed', value: '30' },
+        },
+      ],
     });
 
     const summary = await t.services.dashboard.summary();

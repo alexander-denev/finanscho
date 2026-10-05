@@ -22,13 +22,13 @@ const NAV_ITEMS = [
   { path: '/transactions', labelKey: 'nav.transactions', icon: 'list', placement: 'both' },
   { path: '/budgets', labelKey: 'nav.budgets', icon: 'budget', placement: 'both' },
   { path: '/accounts', labelKey: 'nav.accounts', icon: 'wallet', placement: 'both' },
-  { path: '/recurring', labelKey: 'nav.recurring', icon: 'repeat', placement: 'wide' },
+  { path: '/automations', labelKey: 'nav.automations', icon: 'bolt', placement: 'wide' },
   { path: '/categories', labelKey: 'nav.categories', icon: 'tag', placement: 'wide' },
   { path: '/settings', labelKey: 'nav.settings', icon: 'settings', placement: 'wide' },
   { path: '/more', labelKey: 'nav.more', icon: 'more', placement: 'narrow' },
 ];
 
-const MORE_PATHS = ['/more', '/recurring', '/categories', '/settings'];
+const MORE_PATHS = ['/more', '/automations', '/categories', '/settings'];
 
 /**
  * @param {NavItem} item
@@ -37,7 +37,9 @@ const MORE_PATHS = ['/more', '/recurring', '/categories', '/settings'];
  */
 function isActive(item, current) {
   if (item.path === '/') return current === '/';
-  if (item.placement === 'narrow') return MORE_PATHS.includes(current);
+  if (item.placement === 'narrow') {
+    return MORE_PATHS.some((path) => current === path || current.startsWith(`${path}/`));
+  }
   return current === item.path || current.startsWith(`${item.path}/`);
 }
 

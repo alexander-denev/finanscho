@@ -1,0 +1,21 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-3);
+  border: var(--hairline) solid var(--c-rule);
+  border-radius: var(--r-md);
+  background: var(--c-raised);
+}
+
+.head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: var(--sp-2);
+}
+
+.hint {
+  font-size: var(--fs-sm);
+  color: var(--c-muted);
+}

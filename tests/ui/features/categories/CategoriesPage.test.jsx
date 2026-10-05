@@ -65,7 +65,7 @@ describe('CategoriesPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
     expect(
       await within(dialog).findByText(
-        'This category has transactions or recurring transactions, so it can’t be deleted. Archive it instead.',
+        'This category has transactions or automations that use it, so it can’t be deleted. Archive it instead.',
       ),
     ).toBeTruthy();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));

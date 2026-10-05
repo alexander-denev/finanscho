@@ -22,6 +22,15 @@ function dayRange(from, to) {
 }
 
 /**
+ * Key range over every ID that starts with `prefix`.
+ * @param {string} prefix
+ * @returns {IDBKeyRange}
+ */
+function prefixRange(prefix) {
+  return IDBKeyRange.bound(prefix, `${prefix}￿`);
+}
+
+/**
  * @param {Transaction} tx
  * @param {TransactionQuery} query
  * @param {string} needle lower-cased search text
@@ -247,45 +256,22 @@ export class IdbTransactionRepository {
   }
 
   /**
-   * Reads the primary keys `<ruleId>:…` rather than the `recurringRuleId` index: tombstone stubs
-   * drop that field (D40), and skipped occurrences never had it.
-   * @param {string} ruleId
-   * @returns {Promise<Set<string>>} occurrence IDs in any state, including tombstones and stubs
+   * Reads primary keys, not an index: tombstone stubs keep only their ID (D40), and the IDs of an
+   * automation's results all start with its prefix.
+   * @param {string} prefix
+   * @returns {Promise<Set<string>>} IDs in any state, including tombstones and stubs
    */
-  async occurrenceIdsForRule(ruleId) {
-    const keys = await this.#db.getAllKeys(
-      STORES.transactions,
-      IDBKeyRange.bound(`${ruleId}:`, `${ruleId}:\uffff`),
-    );
+  async idsWithPrefix(prefix) {
+    const keys = await this.#db.getAllKeys(STORES.transactions, prefixRange(prefix));
     return new Set(keys.map(String));
   }
 
   /**
-   * Writes recurring occurrences that do not exist locally in any state (including deleted),
-   * with the rule's creation clock so identical occurrences from several devices merge
-   * idempotently and any later user edit wins.
-   * @param {string} ruleId
-   * @param {Transaction[]} occurrences
-   * @returns {Promise<number>}
+   * @param {string} prefix
+   * @returns {Promise<Transaction[]>} visible transactions whose ID starts with `prefix`
    */
-  async materialize(ruleId, occurrences) {
-    let written = 0;
-    await this.#recorder.transact(['transactions', 'recurringRules'], async (ctx) => {
-      const rule = await ctx.get('recurringRules', ruleId);
-      const ruleClock = rule?._clocks.createdAt;
-      if (!rule || !ruleClock) return;
-      for (const occurrence of occurrences) {
-        if (await ctx.get('transactions', occurrence.id)) continue;
-        await ctx.write({
-          entity: 'transactions',
-          id: occurrence.id,
-          fields: fieldsOf(occurrence),
-          origin: 'recurrence',
-          hlc: ruleClock,
-        });
-        written += 1;
-      }
-    });
-    return written;
+  async listWithPrefix(prefix) {
+    const records = await this.#db.getAll(STORES.transactions, prefixRange(prefix));
+    return /** @type {StoredRecord[]} */ (records).filter(isVisible).map((r) => toEntity(r));
   }
 }

@@ -26,9 +26,9 @@ export function BudgetRow({ line, onSelect }) {
         <span className={styles.name}>
           <Swatch color={category.color} />
           {category.name}
-          {budget.recurring && (
+          {budget.automationId && (
             <span className={styles.repeats}>
-              <Icon name="repeat" label={t('budgets.repeats')} />
+              <Icon name="bolt" label={t('budgets.automatic')} />
             </span>
           )}
         </span>

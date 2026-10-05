@@ -38,24 +38,33 @@ describe('BudgetsPage', () => {
     expect(screen.getAllByText('Close to the limit').length).toBeGreaterThan(0);
   });
 
-  it('sets a budget that repeats every month', async () => {
+  it('opens a new automation to repeat a budget every month', async () => {
     const ui = await createUiStores({ path: '/budgets' });
     renderWithStores(<BudgetsPage />, ui.stores);
     fireEvent.click(screen.getAllByRole('button', { name: 'Set a budget' })[0]);
     const dialog = await screen.findByRole('dialog', { name: 'Set a budget' });
+    expect(within(dialog).queryByRole('button', { name: 'Repeat every month' })).toBeNull();
     fireEvent.change(within(dialog).getByLabelText('Category'), {
       target: { value: 'seed:dining' },
     });
     fireEvent.input(within(dialog).getByLabelText('Monthly limit'), { target: { value: '80' } });
-    const repeat = /** @type {HTMLInputElement} */ (
-      within(dialog).getByRole('switch', { name: 'Repeat every month' })
-    );
-    expect(repeat.checked).toBe(false);
-    fireEvent.click(repeat);
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Save budget' }));
-    expect(await screen.findByRole('img', { name: 'Repeats every month' })).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Repeat every month' }));
+    expect(ui.stores.router.currentPath.value).toBe('/automations/new/budget/seed%3Adining/80');
+  });
+
+  it('marks budgets an automation set', async () => {
+    const ui = await createUiStores({ path: '/budgets' });
+    await ui.stores.automations.create({
+      name: 'Dining',
+      startDate: '2024-05-01',
+      triggers: [{ type: 'schedule', frequency: 'monthly', interval: 1, firstDate: '2024-05-01' }],
+      actions: [
+        { type: 'setBudget', categoryId: 'seed:dining', amount: { type: 'fixed', value: '80' } },
+      ],
+    });
     await ui.settled();
-    expect(ui.stores.budgets.data.value?.lines[0].budget.recurring).toBe(true);
+    renderWithStores(<BudgetsPage />, ui.stores);
+    expect(await screen.findByRole('img', { name: 'Set by an automation' })).toBeTruthy();
   });
 
   it("copies last month's budgets into the next month", async () => {

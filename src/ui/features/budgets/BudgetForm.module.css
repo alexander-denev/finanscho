@@ -14,3 +14,15 @@
 .spacer {
   flex: 1;
 }
+
+.repeat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-1);
+}
+
+.hint {
+  font-size: var(--fs-sm);
+  color: var(--c-muted);
+}

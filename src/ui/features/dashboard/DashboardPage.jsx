@@ -12,7 +12,7 @@ import { DashboardSection } from './DashboardSection.jsx';
 import styles from './DashboardPage.module.css';
 
 /**
- * Overview: balances, this month's flow, budget status, and upcoming recurring transactions.
+ * Overview: balances, this month's flow, budget status, and what automations make soon.
  * @returns {import('preact').JSX.Element}
  */
 export function DashboardPage() {
@@ -60,17 +60,23 @@ export function DashboardPage() {
     );
   }
 
-  const upcoming = summary.upcoming.map((item) => ({
-    key: `${item.ruleId}:${item.date}`,
-    date: item.date,
-    title:
-      item.template.payee ||
-      (item.template.categoryId ? categoryById.get(item.template.categoryId)?.name : undefined) ||
-      t(`kind.${item.template.kind}`),
-    minor: item.template.amountMinor,
-    currency: accountById.get(item.template.accountId)?.currency ?? 'EUR',
-    kind: item.template.kind,
-  }));
+  const upcoming = summary.upcoming.map((item) => {
+    const title =
+      item.transaction.payee ||
+      (item.transaction.categoryId
+        ? categoryById.get(item.transaction.categoryId)?.name
+        : undefined) ||
+      item.name;
+    return {
+      key: `${item.automationId}:${item.triggerIndex}:${item.actionIndex}:${item.plannedDate}`,
+      date: item.date,
+      title,
+      subtitle: item.name === title ? undefined : item.name,
+      minor: item.transaction.amountMinor,
+      currency: accountById.get(item.transaction.accountId)?.currency ?? 'EUR',
+      kind: item.transaction.kind,
+    };
+  });
   const { lines, over, near } = summary.budgets;
 
   return (
@@ -188,7 +194,7 @@ export function DashboardPage() {
       <DashboardSection
         id="dash-upcoming"
         title={t('dashboard.upcoming')}
-        link={{ href: '/recurring', label: t('dashboard.viewAll') }}
+        link={{ href: '/automations', label: t('dashboard.viewAll') }}
       >
         <UpcomingList items={upcoming} emptyText={t('dashboard.noUpcoming')} />
       </DashboardSection>

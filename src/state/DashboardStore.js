@@ -13,7 +13,7 @@ import { createLoadState } from './loadState.js';
 /** Dashboard aggregates. */
 export class DashboardStore {
   /** @type {ReadonlyArray<ChangedEntity>} */
-  static DEPENDS_ON = ['accounts', 'categories', 'transactions', 'budgets', 'recurringRules'];
+  static DEPENDS_ON = ['accounts', 'categories', 'transactions', 'budgets', 'automations'];
 
   #service;
   #summary = signal(/** @type {DashboardSummary | null} */ (null));

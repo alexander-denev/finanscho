@@ -8,7 +8,7 @@ import { useContext } from 'preact/hooks';
  * @property {import('../../state/CategoriesStore.js').CategoriesStore} categories
  * @property {import('../../state/TransactionsStore.js').TransactionsStore} transactions
  * @property {import('../../state/BudgetsStore.js').BudgetsStore} budgets
- * @property {import('../../state/RecurringStore.js').RecurringStore} recurring
+ * @property {import('../../state/AutomationsStore.js').AutomationsStore} automations
  * @property {import('../../state/DashboardStore.js').DashboardStore} dashboard
  * @property {import('../../state/SettingsStore.js').SettingsStore} settings
  * @property {import('../../state/SyncStore.js').SyncStore} sync

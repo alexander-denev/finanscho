@@ -1,4 +1,5 @@
 import { Amount } from '../../components/Amount.jsx';
+import { isAutomatic } from '../../../core/domain/transaction.js';
 import { Swatch } from '../../components/Swatch.jsx';
 import { t } from '../../i18n/i18n.js';
 import styles from './TransactionListItem.module.css';
@@ -48,8 +49,8 @@ export function TransactionListItem({
         <span className={styles.title}>{title}</span>
         <span className={styles.details}>
           {details.join(' — ')}
-          {transaction.recurringRuleId && (
-            <span className={styles.badge}>{t('transactions.recurringBadge')}</span>
+          {isAutomatic(transaction) && (
+            <span className={styles.badge}>{t('transactions.automaticBadge')}</span>
           )}
         </span>
       </span>

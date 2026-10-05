@@ -43,7 +43,7 @@ describe('AccountService', () => {
     await expect(t.services.accounts.get('nope')).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it('deletes only accounts that no transaction or recurring rule uses', async () => {
+  it('deletes only accounts that no transaction or automation uses', async () => {
     const t = await createTestServices();
     await t.services.categories.seedDefaults();
     const unused = await makeAccount(t, 'Unused');
@@ -57,12 +57,17 @@ describe('AccountService', () => {
       accountId: used.id,
       toAccountId: target.id,
     });
-    await t.services.recurring.create({
-      frequency: 'monthly',
-      interval: 1,
+    await t.services.automations.create({
+      name: 'Monthly',
       startDate: '2024-06-01',
-      endDate: null,
-      template: { kind: 'expense', amount: '1', accountId: scheduled.id, categoryId: null },
+      triggers: [{ type: 'schedule', frequency: 'monthly', interval: 1, firstDate: '2024-06-01' }],
+      actions: [
+        {
+          type: 'createTransaction',
+          template: { kind: 'expense', accountId: scheduled.id, categoryId: null },
+          amount: { type: 'fixed', value: '1' },
+        },
+      ],
     });
 
     for (const account of [used, target, scheduled]) {
@@ -98,7 +103,7 @@ describe('AccountService', () => {
       categoryId: null,
       payee: '',
       note: '',
-      recurringRuleId: null,
+      automationId: null,
       createdAt: t.clock.nowIso(),
       updatedAt: t.clock.nowIso(),
       deleted: false,

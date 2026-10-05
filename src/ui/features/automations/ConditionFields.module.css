@@ -1,0 +1,14 @@
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: var(--sp-2);
+  padding-bottom: var(--sp-3);
+  border-bottom: var(--hairline) solid var(--c-rule);
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--field-min)), 1fr));
+  gap: var(--sp-3);
+}

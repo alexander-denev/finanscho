@@ -1,4 +1,5 @@
 import { accountEdits, createAccount } from '../domain/account.js';
+import { referencedIds } from '../domain/automation.js';
 import { createBalanceAdjustment } from '../domain/transaction.js';
 import { InUseError, NotFoundError } from '../errors.js';
 
@@ -6,7 +7,7 @@ import { InUseError, NotFoundError } from '../errors.js';
 /** @typedef {import('../domain/account.js').AccountInput} AccountInput */
 /** @typedef {import('../ports/repositories.js').AccountRepository} AccountRepository */
 /** @typedef {import('../ports/repositories.js').TransactionRepository} TransactionRepository */
-/** @typedef {import('../ports/repositories.js').RecurringRuleRepository} RecurringRuleRepository */
+/** @typedef {import('../ports/repositories.js').AutomationRepository} AutomationRepository */
 /** @typedef {import('../ports/clock.js').Clock} Clock */
 /** @typedef {import('../ports/idGenerator.js').IdGenerator} IdGenerator */
 
@@ -19,17 +20,17 @@ import { InUseError, NotFoundError } from '../errors.js';
 export class AccountService {
   #accounts;
   #transactions;
-  #rules;
+  #automations;
   #clock;
   #ids;
 
   /**
-   * @param {{ accounts: AccountRepository, transactions: TransactionRepository, rules: RecurringRuleRepository, clock: Clock, ids: IdGenerator }} deps
+   * @param {{ accounts: AccountRepository, transactions: TransactionRepository, automations: AutomationRepository, clock: Clock, ids: IdGenerator }} deps
    */
-  constructor({ accounts, transactions, rules, clock, ids }) {
+  constructor({ accounts, transactions, automations, clock, ids }) {
     this.#accounts = accounts;
     this.#transactions = transactions;
-    this.#rules = rules;
+    this.#automations = automations;
     this.#clock = clock;
     this.#ids = ids;
   }
@@ -144,14 +145,14 @@ export class AccountService {
   }
 
   /**
-   * Whether any transaction or recurring rule (including ended ones) uses the account.
+   * Whether any transaction or automation (including ended ones) uses the account.
    * @param {string} id
    * @returns {Promise<boolean>}
    */
   async isInUse(id) {
     if (await this.#transactions.hasAnyForAccount(id)) return true;
-    const rules = await this.#rules.list();
-    return rules.some((r) => r.template.accountId === id || r.template.toAccountId === id);
+    const automations = await this.#automations.list();
+    return automations.some((a) => referencedIds(a).accountIds.has(id));
   }
 
   /**
@@ -168,7 +169,7 @@ export class AccountService {
   }
 
   /**
-   * Restores deleted accounts that a transaction or rule uses again. That happens when another
+   * Restores deleted accounts that a transaction or automation uses again. That happens when another
    * device used an empty account while this one deleted it; the data wins over the delete.
    * Runs after every pull.
    * @returns {Promise<number>} how many accounts were restored

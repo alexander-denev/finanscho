@@ -193,4 +193,34 @@ describe('TransactionsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(50));
   });
+
+  it('says which automation made a transaction and links to it', async () => {
+    const ui = await setup(async (u, accountId) => {
+      await u.stores.automations.create({
+        name: 'Rent',
+        startDate: '2024-05-01',
+        triggers: [
+          { type: 'schedule', frequency: 'monthly', interval: 1, firstDate: '2024-05-01' },
+        ],
+        actions: [
+          {
+            type: 'createTransaction',
+            template: { kind: 'expense', accountId, payee: 'Landlord' },
+            amount: { type: 'fixed', value: '800' },
+          },
+        ],
+      });
+    });
+    const row = await screen.findByRole('button', { name: /Landlord/ });
+    expect(row.textContent).toContain('Automatic');
+    fireEvent.click(row);
+    const dialog = await screen.findByRole('dialog', { name: 'Edit transaction' });
+    expect(within(dialog).getByText(/Made by the automation “Rent”/)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+    expect(await screen.findByText(/the automation won’t make it again/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    const reopened = await screen.findByRole('dialog', { name: 'Edit transaction' });
+    fireEvent.click(within(reopened).getByRole('button', { name: 'Open automation' }));
+    expect(ui.stores.router.currentPath.value).toMatch(/^\/automations\/.+/);
+  });
 });

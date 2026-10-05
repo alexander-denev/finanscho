@@ -4,8 +4,8 @@ import { firstDayOfMonth, lastDayOfMonth, yearMonthOf } from '../domain/localDat
 /** @typedef {import('./AccountService.js').AccountBalance} AccountBalance */
 /** @typedef {import('./BudgetService.js').BudgetService} BudgetService */
 /** @typedef {import('./BudgetService.js').BudgetLine} BudgetLine */
-/** @typedef {import('./RecurringService.js').RecurringService} RecurringService */
-/** @typedef {import('./RecurringService.js').UpcomingOccurrence} UpcomingOccurrence */
+/** @typedef {import('./AutomationService.js').AutomationService} AutomationService */
+/** @typedef {import('./AutomationService.js').UpcomingItem} UpcomingItem */
 /** @typedef {import('../ports/repositories.js').TransactionRepository} TransactionRepository */
 /** @typedef {import('../ports/clock.js').Clock} Clock */
 
@@ -18,7 +18,7 @@ import { firstDayOfMonth, lastDayOfMonth, yearMonthOf } from '../domain/localDat
  * @property {CurrencyAmount[]} totals balance totals per currency
  * @property {{ currency: string, incomeMinor: number, expenseMinor: number }[]} monthFlow this month's income and expense per currency (transfers and balance adjustments excluded)
  * @property {{ lines: BudgetLine[], over: number, near: number }} budgets this month's budget status
- * @property {UpcomingOccurrence[]} upcoming recurring occurrences in the next 30 days
+ * @property {UpcomingItem[]} upcoming transactions automations will make in the next 30 days
  */
 
 /**
@@ -35,17 +35,17 @@ function add(map, key, amount) {
 export class DashboardService {
   #accounts;
   #budgets;
-  #recurring;
+  #automations;
   #transactions;
   #clock;
 
   /**
-   * @param {{ accounts: AccountService, budgets: BudgetService, recurring: RecurringService, transactions: TransactionRepository, clock: Clock }} deps
+   * @param {{ accounts: AccountService, budgets: BudgetService, automations: AutomationService, transactions: TransactionRepository, clock: Clock }} deps
    */
-  constructor({ accounts, budgets, recurring, transactions, clock }) {
+  constructor({ accounts, budgets, automations, transactions, clock }) {
     this.#accounts = accounts;
     this.#budgets = budgets;
-    this.#recurring = recurring;
+    this.#automations = automations;
     this.#transactions = transactions;
     this.#clock = clock;
   }
@@ -58,7 +58,7 @@ export class DashboardService {
       this.#accounts.list({ includeArchived: true }),
       this.#transactions.listInRange(firstDayOfMonth(month), lastDayOfMonth(month)),
       this.#budgets.forMonth(month),
-      this.#recurring.upcoming(),
+      this.#automations.upcoming(),
     ]);
 
     /** @type {Map<string, number>} */

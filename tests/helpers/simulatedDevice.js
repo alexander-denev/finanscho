@@ -62,11 +62,12 @@ export async function createDevice(server, name, options = {}) {
       compactMinOps: options.compactMinOps,
       deviceId,
       getDeviceName: async () => name,
-      afterPull: async () => {
+      afterPull: async (changed) => {
         await t.services.accounts.restoreUsed();
         await t.services.categories.restoreUsed();
-        await t.services.recurring.materialize();
-        await t.services.budgets.materialize();
+        await t.services.automations.run({
+          events: changed.has('transactions') || changed.has('automations'),
+        });
       },
       changeFeed: t.feed,
       nowIso: () => clock.nowIso(),

@@ -1,12 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { IdbTransactionRepository } from '../../../../src/infrastructure/db/repositories/IdbTransactionRepository.js';
-import { IdbRecurringRuleRepository } from '../../../../src/infrastructure/db/repositories/IdbRecurringRuleRepository.js';
 import { STORES } from '../../../../src/infrastructure/db/database.js';
-import { buildOccurrence } from '../../../../src/core/domain/recurringRule.js';
 import { createTestDb } from '../../../helpers/testDb.js';
 
 /** @typedef {import('../../../../src/core/domain/transaction.js').Transaction} Transaction */
-/** @typedef {import('../../../../src/core/domain/recurringRule.js').RecurringRule} RecurringRule */
 
 /**
  * @param {Partial<Transaction> & { id: string }} over
@@ -22,7 +19,7 @@ function tx(over) {
     categoryId: 'c1',
     payee: '',
     note: '',
-    recurringRuleId: null,
+    automationId: null,
     createdAt: '2024-05-10T08:00:00.000Z',
     updatedAt: '2024-05-10T08:00:00.000Z',
     deleted: false,
@@ -149,42 +146,17 @@ describe('IdbTransactionRepository', () => {
     expect(items.map((t) => t.id)).toEqual(['open']);
   });
 
-  it('materializes occurrences with the rule clock and never rewrites existing ids', async () => {
-    const rules = new IdbRecurringRuleRepository({ db: env.db, recorder: env.recorder });
-    /** @type {RecurringRule} */
-    const rule = {
-      id: 'r1',
-      frequency: 'monthly',
-      interval: 1,
-      startDate: '2024-01-31',
-      endDate: null,
-      template: {
-        kind: 'expense',
-        amountMinor: 999,
-        accountId: 'a1',
-        toAccountId: null,
-        categoryId: 'c1',
-        payee: 'Gym',
-        note: '',
-      },
-      createdAt: '2024-01-01T00:00:00.000Z',
-      updatedAt: '2024-01-01T00:00:00.000Z',
-      deleted: false,
-    };
-    await rules.create(rule);
-    const ruleClock = (await env.db.get(STORES.recurringRules, 'r1'))._clocks.createdAt;
-
-    const jan = buildOccurrence(rule, '2024-01-31');
-    const feb = buildOccurrence(rule, '2024-02-29');
-    expect(await repo.materialize('r1', [jan, feb])).toBe(2);
-    const stored = await env.db.get(STORES.transactions, jan.id);
-    expect(Object.values(stored._clocks).every((c) => c === ruleClock)).toBe(true);
-    const outbox = await env.db.getAll(STORES.outbox);
-    expect(outbox.filter((o) => o.origin === 'recurrence')).toHaveLength(2);
-
-    await repo.remove(feb.id, 'u');
-    expect(await repo.materialize('r1', [jan, feb])).toBe(0);
-    expect(await repo.get(feb.id)).toBeNull();
-    expect(await repo.materialize('missing-rule', [buildOccurrence(rule, '2024-03-31')])).toBe(0);
+  it('finds IDs by prefix in any state, and lists the visible ones', async () => {
+    await repo.create(tx({ id: 'auto1:a0:x' }));
+    await repo.create(tx({ id: 'auto1:t0:a0:2024-05-01' }));
+    await repo.create(tx({ id: 'auto10:a0:x' }));
+    await repo.create(tx({ id: 'other' }));
+    await repo.remove('auto1:a0:x', 'u');
+    expect(await repo.idsWithPrefix('auto1:')).toEqual(
+      new Set(['auto1:a0:x', 'auto1:t0:a0:2024-05-01']),
+    );
+    expect((await repo.listWithPrefix('auto1:')).map((t) => t.id)).toEqual([
+      'auto1:t0:a0:2024-05-01',
+    ]);
   });
 });

@@ -113,11 +113,10 @@ export class BudgetsStore {
    * Sets the limit for a category in the selected month.
    * @param {string} categoryId
    * @param {string} limit user-typed amount
-   * @param {boolean} [recurring] repeat in every following month
    * @returns {Promise<void>}
    */
-  async setBudget(categoryId, limit, recurring = false) {
-    await this.#service.set({ categoryId, month: this.#month.value, limit, recurring });
+  async setBudget(categoryId, limit) {
+    await this.#service.set({ categoryId, month: this.#month.value, limit });
   }
 
   /**
@@ -131,13 +130,5 @@ export class BudgetsStore {
   /** @returns {Promise<number>} how many budgets were copied */
   copyPreviousMonth() {
     return this.#service.copyFromPreviousMonth(this.#month.value);
-  }
-
-  /**
-   * Carries recurring budgets into the months up to the current one.
-   * @returns {Promise<number>}
-   */
-  materialize() {
-    return this.#service.materialize();
   }
 }

@@ -38,7 +38,7 @@ describe('CategoryService', () => {
     expect(await t.services.categories.list()).toEqual([]);
   });
 
-  it('deletes only categories that no transaction or recurring rule uses', async () => {
+  it('deletes only categories that no transaction or automation uses', async () => {
     const t = await createTestServices();
     await t.services.categories.seedDefaults();
     const account = await makeAccount(t, 'Main');
@@ -49,22 +49,28 @@ describe('CategoryService', () => {
       accountId: account.id,
       categoryId: 'seed:groceries',
     });
-    await t.services.recurring.create({
-      frequency: 'monthly',
-      interval: 1,
+    await t.services.automations.create({
+      name: 'Monthly',
       startDate: '2024-06-01',
-      endDate: null,
-      template: { kind: 'expense', amount: '1', accountId: account.id, categoryId: 'seed:travel' },
+      triggers: [{ type: 'schedule', frequency: 'monthly', interval: 1, firstDate: '2024-06-01' }],
+      actions: [
+        {
+          type: 'createTransaction',
+          template: { kind: 'expense', accountId: account.id, categoryId: 'seed:travel' },
+          amount: { type: 'fixed', value: '1' },
+        },
+        { type: 'setBudget', categoryId: 'seed:health', amount: { type: 'fixed', value: '50' } },
+      ],
     });
 
-    for (const id of ['seed:groceries', 'seed:travel']) {
+    for (const id of ['seed:groceries', 'seed:travel', 'seed:health']) {
       expect(await t.services.categories.isInUse(id)).toBe(true);
       await expect(t.services.categories.remove(id)).rejects.toBeInstanceOf(InUseError);
     }
     await expect(t.services.categories.remove('seed:travel')).rejects.toMatchObject({
       code: 'categoryInUse',
     });
-    // A budget alone doesn't keep a category.
+    // A budget alone doesn't keep a category (a Set budget step does, D53).
     await t.services.budgets.set({ categoryId: 'seed:dining', month: '2024-05', limit: '100' });
     expect(await t.services.categories.isInUse('seed:dining')).toBe(false);
     await t.services.categories.remove('seed:dining');
@@ -89,7 +95,7 @@ describe('CategoryService', () => {
       categoryId: 'seed:dining',
       payee: '',
       note: '',
-      recurringRuleId: null,
+      automationId: null,
       createdAt: t.clock.nowIso(),
       updatedAt: t.clock.nowIso(),
       deleted: false,

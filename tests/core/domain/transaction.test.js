@@ -43,7 +43,7 @@ describe('transaction', () => {
       note: '',
     });
     const tx = createTransaction(fields, ctx);
-    expect(tx.recurringRuleId).toBeNull();
+    expect(tx.automationId).toBeNull();
     expect(tx.createdAt).toBe(ctx.now);
   });
 
@@ -148,7 +148,7 @@ describe('transaction', () => {
       categoryId: null,
       payee: '',
       note: '',
-      recurringRuleId: null,
+      automationId: null,
       adjustment: true,
       createdAt: ctx.now,
       updatedAt: ctx.now,

@@ -18,7 +18,7 @@ export const STORES = /** @type {const} */ ({
   categories: 'categories',
   transactions: 'transactions',
   budgets: 'budgets',
-  recurringRules: 'recurringRules',
+  automations: 'automations',
   outbox: 'outbox',
   syncCursors: 'syncCursors',
   meta: 'meta',
@@ -33,12 +33,12 @@ export const TX_INDEXES = /** @type {const} */ ({
   categoryId: 'categoryId',
   categoryDate: 'categoryId_date',
   dateCreated: 'date_createdAt',
-  recurringRuleId: 'recurringRuleId',
 });
 
 /**
  * Ordered migrations. Migration `i` upgrades the schema from version `i` to `i + 1`. Never edit a
- * released migration; append a new one.
+ * released migration; append a new one. Released migrations name stores and indexes that were
+ * later removed with string literals, so they keep working after the constants are gone.
  * @type {ReadonlyArray<(db: Db, tx: UpgradeTransaction) => void>}
  */
 const MIGRATIONS = [
@@ -55,16 +55,23 @@ const MIGRATIONS = [
     transactions.createIndex(TX_INDEXES.categoryId, 'categoryId');
     transactions.createIndex(TX_INDEXES.categoryDate, ['categoryId', 'date']);
     transactions.createIndex(TX_INDEXES.dateCreated, ['date', 'createdAt']);
-    transactions.createIndex(TX_INDEXES.recurringRuleId, 'recurringRuleId');
+    transactions.createIndex('recurringRuleId', 'recurringRuleId');
 
     const budgets = db.createObjectStore(STORES.budgets, { keyPath: 'id' });
     budgets.createIndex('month', 'month');
 
-    db.createObjectStore(STORES.recurringRules, { keyPath: 'id' });
+    db.createObjectStore('recurringRules', { keyPath: 'id' });
     db.createObjectStore(STORES.outbox, { keyPath: 'seq' });
     db.createObjectStore(STORES.syncCursors, { keyPath: 'deviceId' });
     db.createObjectStore(STORES.meta);
     db.createObjectStore(STORES.settings);
+  },
+  // v2: automations replace recurring rules (docs/DECISIONS.md, D50). Old rules are dropped, not
+  // migrated; the never-read `recurringRuleId` index goes with them.
+  (db, tx) => {
+    tx.objectStore(STORES.transactions).deleteIndex('recurringRuleId');
+    db.deleteObjectStore('recurringRules');
+    db.createObjectStore(STORES.automations, { keyPath: 'id' });
   },
 ];
 

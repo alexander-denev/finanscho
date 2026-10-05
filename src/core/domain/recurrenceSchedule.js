@@ -20,6 +20,8 @@ export const FREQUENCIES = /** @type {const} */ (['daily', 'weekly', 'monthly', 
  * @property {number} interval every N days/weeks/months/years, N ≥ 1
  * @property {LocalDate} startDate the first occurrence
  * @property {LocalDate | null} endDate last possible occurrence date (inclusive), or none
+ * @property {number} [anchorDay] monthly/yearly day of the month, clamped to the month's length;
+ *   defaults to the start date's day. 31 means "the last day of the month".
  */
 
 /**
@@ -30,7 +32,7 @@ export const FREQUENCIES = /** @type {const} */ (['daily', 'weekly', 'monthly', 
  */
 export function occurrenceDate(schedule, index) {
   const { frequency, interval, startDate } = schedule;
-  const anchorDay = parseLocalDate(startDate).day;
+  const anchorDay = schedule.anchorDay ?? parseLocalDate(startDate).day;
   switch (frequency) {
     case 'daily':
       return addDays(startDate, index * interval);

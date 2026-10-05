@@ -21,7 +21,7 @@ import styles from './BudgetsPage.module.css';
  * @returns {import('preact').JSX.Element}
  */
 export function BudgetsPage() {
-  const { budgets, settings, toasts } = useStores();
+  const { budgets, settings, toasts, router } = useStores();
   const editing = useSignal(/** @type {{ budgetId: string | null } | null} */ (null));
   const data = budgets.data.value;
   const lines = data?.lines ?? [];
@@ -38,9 +38,17 @@ export function BudgetsPage() {
 
   /** @param {BudgetDraft} draft */
   const save = async (draft) => {
-    await budgets.setBudget(draft.categoryId, draft.limit, draft.recurring);
+    await budgets.setBudget(draft.categoryId, draft.limit);
     toasts.show('toast.budgetSaved');
     close();
+  };
+
+  /** @param {BudgetDraft} draft */
+  const repeat = (draft) => {
+    close();
+    router.navigate(
+      `/automations/new/budget/${encodeURIComponent(draft.categoryId)}/${encodeURIComponent(draft.limit.trim())}`,
+    );
   };
 
   const remove = async () => {
@@ -149,15 +157,15 @@ export function BudgetsPage() {
                     editingLine.budget.limitMinor,
                     editingLine.budget.currency,
                   ),
-                  recurring: editingLine.budget.recurring === true,
                 }
-              : { categoryId: '', limit: '', recurring: false }
+              : { categoryId: '', limit: '' }
           }
           categories={editingLine ? [editingLine.category] : (data?.unbudgeted ?? [])}
           currency={currency}
           onSubmit={save}
           onCancel={close}
           onRemove={editingLine ? () => void remove() : undefined}
+          onRepeat={repeat}
         />
       </Dialog>
     </>

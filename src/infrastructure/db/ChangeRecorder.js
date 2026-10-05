@@ -8,7 +8,7 @@
 
 import { HybridLogicalClock } from '../sync/HybridLogicalClock.js';
 import { applyOp, isPrunableTombstone, recordToOps, tombstoneStub } from '../sync/merge.js';
-import { isSupportedOp, OP_VERSION } from '../sync/operation.js';
+import { isRetiredOp, isSupportedOp, OP_VERSION, SYNCED_ENTITIES } from '../sync/operation.js';
 import { STORES } from './database.js';
 
 /** @typedef {import('./database.js').Db} Db */
@@ -36,13 +36,7 @@ export const META_KEYS = /** @type {const} */ ({
 export const TOMBSTONE_PRUNE_AGE_MS = 30 * 86_400_000;
 
 /** Entity stores, in the order their state is re-queued. */
-const ENTITIES = /** @type {EntityName[]} */ ([
-  STORES.accounts,
-  STORES.categories,
-  STORES.transactions,
-  STORES.budgets,
-  STORES.recurringRules,
-]);
+const ENTITIES = /** @type {EntityName[]} */ ([...SYNCED_ENTITIES]);
 
 /**
  * @typedef {object} WriteRequest
@@ -50,7 +44,7 @@ const ENTITIES = /** @type {EntityName[]} */ ([
  * @property {string} id
  * @property {Record<string, unknown>} fields
  * @property {OpOrigin} [origin] defaults to 'user'
- * @property {string} [hlc] explicit clock (seeds, occurrences, imports); defaults to a fresh tick
+ * @property {string} [hlc] explicit clock (seeds, automation results, imports); defaults to a fresh tick
  */
 
 /**
@@ -313,8 +307,8 @@ export class ChangeRecorder {
 
   /**
    * Rewrites tombstones deleted more than `olderThanMs` ago as stubs (`tombstoneStub`). Local
-   * only: no ops, no change-feed event (nothing visible changes). Stubs are never purged: recurring
-   * materialization relies on the ID existing, and `_clocks.deleted` must keep beating late ops.
+   * only: no ops, no change-feed event (nothing visible changes). Stubs are never purged: automations
+   * rely on a result's ID existing, and `_clocks.deleted` must keep beating late ops.
    * @param {number} nowMs
    * @param {number} [olderThanMs]
    * @returns {Promise<number>} records pruned
@@ -339,7 +333,7 @@ export class ChangeRecorder {
   /**
    * Merges a batch of remote ops from one device and advances that device's cursor, atomically.
    * Ops this client does not understand (newer `v`, unknown entity) are kept in `meta` for replay
-   * after an app update instead of being dropped.
+   * after an app update instead of being dropped. Ops of retired entities are dropped.
    *
    * `frontier` is passed with the last segment of a checkpoint: the checkpoint contains every op
    * of those devices up to those seqs, so their cursors are raised to at least that far, in the
@@ -350,15 +344,7 @@ export class ChangeRecorder {
    * @returns {Promise<{ changed: EntityName[], deferred: number }>}
    */
   async applyRemote(ops, cursor, frontier) {
-    const stores = [
-      STORES.accounts,
-      STORES.categories,
-      STORES.transactions,
-      STORES.budgets,
-      STORES.recurringRules,
-      STORES.meta,
-      STORES.syncCursors,
-    ];
+    const stores = [...ENTITIES, STORES.meta, STORES.syncCursors];
     const tx = /** @type {WriteTx} */ (this.#db.transaction(stores, 'readwrite'));
     const done = observeDone(tx);
     const meta = tx.objectStore(STORES.meta);
@@ -379,6 +365,7 @@ export class ChangeRecorder {
     for (const op of ops) {
       if (op.seq <= appliedSeq) continue;
       clock.receive(op.hlc, this.#nowMs());
+      if (isRetiredOp(op)) continue;
       if (!isSupportedOp(op)) {
         deferred.push(op);
         continue;
@@ -405,14 +392,17 @@ export class ChangeRecorder {
   }
 
   /**
-   * Re-applies previously deferred remote ops that this client now supports.
+   * Re-applies previously deferred remote ops that this client now supports, and drops those of
+   * retired entities.
    * @returns {Promise<EntityName[]>} entities that changed
    */
   async replayDeferred() {
     const deferred = /** @type {Op[] | undefined} */ (
       await this.#db.get(STORES.meta, META_KEYS.deferredOps)
     );
-    if (!Array.isArray(deferred) || !deferred.some(isSupportedOp)) return [];
+    if (!Array.isArray(deferred) || !deferred.some((op) => isSupportedOp(op) || isRetiredOp(op))) {
+      return [];
+    }
     const tx = /** @type {WriteTx} */ (
       this.#db.transaction(
         [...new Set(deferred.filter(isSupportedOp).map((op) => op.entity)), STORES.meta],
@@ -431,7 +421,7 @@ export class ChangeRecorder {
       }
     }
     await tx.objectStore(STORES.meta).put(
-      deferred.filter((op) => !isSupportedOp(op)),
+      deferred.filter((op) => !isSupportedOp(op) && !isRetiredOp(op)),
       META_KEYS.deferredOps,
     );
     await done;

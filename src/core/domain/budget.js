@@ -8,14 +8,15 @@ import { throwIfInvalid } from './validation.js';
 /**
  * A monthly spending limit for one expense category. The ID is deterministic
  * (`<categoryId>:<YYYY-MM>`) so two devices setting the same budget converge on one record.
- * A `recurring` budget is copied into each following month up to the current one, until a month
- * has its own budget, a removed budget, or a budget that doesn't repeat. Budgets written before
- * this field existed lack it, which means `false`.
+ * `automationId` names the automation that set it (null when the user did). `recurring` is the
+ * "repeat every month" flag of app versions before automations (D50): new writes always set it to
+ * false, so those versions never copy a budget forward that this version wrote.
  * @typedef {BaseEntity & {
  *   categoryId: string,
  *   month: YearMonth,
  *   limitMinor: number,
  *   currency: string,
+ *   automationId?: string | null,
  *   recurring?: boolean,
  * }} Budget
  */
@@ -25,7 +26,6 @@ import { throwIfInvalid } from './validation.js';
  * @property {string} categoryId
  * @property {string} month 'YYYY-MM'
  * @property {string} limit user-typed amount
- * @property {boolean} [recurring] repeat every month (default false)
  */
 
 /**
@@ -66,7 +66,7 @@ export function parseBudgetId(id) {
  * @param {BudgetInput} input
  * @param {{ kind: 'income' | 'expense' } | null} category
  * @param {string} currency
- * @returns {{ id: string, categoryId: string, month: YearMonth, limitMinor: number, currency: string, recurring: boolean }}
+ * @returns {{ id: string, categoryId: string, month: YearMonth, limitMinor: number, currency: string, automationId: null, recurring: false }}
  * @throws {import('../errors.js').ValidationError}
  */
 export function normalizeBudgetInput(input, category, currency) {
@@ -87,7 +87,8 @@ export function normalizeBudgetInput(input, category, currency) {
     month: input.month,
     limitMinor: limit.ok ? limit.minor : 0,
     currency,
-    recurring: input.recurring === true,
+    automationId: null,
+    recurring: false,
   };
 }
 
