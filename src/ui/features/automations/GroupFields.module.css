@@ -1,0 +1,37 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.choose {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.legend {
+  margin-bottom: var(--sp-2);
+  padding: 0;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+}
+
+.fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.error {
+  font-size: var(--fs-sm);
+  color: var(--c-brick);
+  font-weight: var(--fw-strong);
+}

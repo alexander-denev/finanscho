@@ -48,7 +48,7 @@ describe('DashboardService', () => {
     await t.services.automations.create({
       name: 'Stream',
       startDate: '2024-05-20',
-      triggers: [{ type: 'schedule', frequency: 'monthly', interval: 1, firstDate: '2024-05-20' }],
+      triggers: [{ type: 'schedule', every: 1, unit: 'month', monthDay: { kind: 'day', day: 20 } }],
       actions: [
         {
           type: 'createTransaction',

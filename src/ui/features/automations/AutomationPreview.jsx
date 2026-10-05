@@ -8,6 +8,8 @@ import styles from './AutomationPreview.module.css';
 /**
  * @typedef {object} AutomationPreviewProps
  * @property {Preview | null} preview null while the form is incomplete
+ * @property {boolean} hasSchedule show the next dates
+ * @property {boolean} reacts show the recent transactions that would set it off
  * @property {(accountId: string) => string} currencyOf
  * @property {(categoryId: string) => string | undefined} categoryName
  */
@@ -18,7 +20,7 @@ import styles from './AutomationPreview.module.css';
  * @param {AutomationPreviewProps} props
  * @returns {import('preact').JSX.Element}
  */
-export function AutomationPreview({ preview, currencyOf, categoryName }) {
+export function AutomationPreview({ preview, hasSchedule, reacts, currencyOf, categoryName }) {
   /**
    * @param {AutomationResult[]} results
    * @returns {import('preact').JSX.Element}
@@ -67,7 +69,7 @@ export function AutomationPreview({ preview, currencyOf, categoryName }) {
         <p className={styles.muted}>{t('automations.preview.incomplete')}</p>
       ) : (
         <>
-          {(preview.dates.length > 0 || preview.matches.length === 0) && (
+          {hasSchedule && (
             <div className={styles.block}>
               <h4 className={styles.subheading}>{t('automations.preview.dates')}</h4>
               {preview.dates.length === 0 ? (
@@ -86,9 +88,12 @@ export function AutomationPreview({ preview, currencyOf, categoryName }) {
               )}
             </div>
           )}
-          {preview.matches.length > 0 && (
+          {reacts && (
             <div className={styles.block}>
               <h4 className={styles.subheading}>{t('automations.preview.matches')}</h4>
+              {preview.matches.length === 0 && (
+                <p className={styles.muted}>{t('automations.preview.noMatches')}</p>
+              )}
               <ul className={styles.entries}>
                 {preview.matches.map(({ source, results }) => (
                   <li key={source.id}>

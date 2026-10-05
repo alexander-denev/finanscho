@@ -3,6 +3,7 @@ import { TransactionsPage } from '../ui/features/transactions/TransactionsPage.j
 import { BudgetsPage } from '../ui/features/budgets/BudgetsPage.jsx';
 import { AccountsPage } from '../ui/features/accounts/AccountsPage.jsx';
 import { AutomationsPage } from '../ui/features/automations/AutomationsPage.jsx';
+import { AutomationEditorPage } from '../ui/features/automations/AutomationEditorPage.jsx';
 import { CategoriesPage } from '../ui/features/categories/CategoriesPage.jsx';
 import { SettingsPage } from '../ui/features/settings/SettingsPage.jsx';
 import { MorePage } from '../ui/features/navigation/MorePage.jsx';
@@ -18,8 +19,10 @@ export const ROUTES = [
   { path: '/accounts', component: AccountsPage },
   { path: '/accounts/new', component: AccountsPage },
   { path: '/automations', component: AutomationsPage },
-  { path: '/automations/:id', component: AutomationsPage },
-  { path: '/automations/new/budget/:categoryId/:limit', component: AutomationsPage },
+  // '/new' before '/:id': the first matching route wins.
+  { path: '/automations/new', component: AutomationEditorPage },
+  { path: '/automations/new/budget/:categoryId/:limit', component: AutomationEditorPage },
+  { path: '/automations/:id', component: AutomationEditorPage },
   { path: '/categories', component: CategoriesPage },
   { path: '/settings', component: SettingsPage },
   { path: '/more', component: MorePage },

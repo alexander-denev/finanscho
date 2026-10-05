@@ -18,9 +18,16 @@
 
 import { ValidationError } from '../errors.js';
 import { budgetId } from './budget.js';
-import { addDays, dayOfWeek, isLocalDate, parseLocalDate, yearMonthOf } from './localDate.js';
+import {
+  addDays,
+  daysInMonth,
+  dayOfWeek,
+  isLocalDate,
+  parseLocalDate,
+  yearMonthOf,
+} from './localDate.js';
 import { isCurrencyCode, parseMoney, toDecimalString } from './money.js';
-import { FREQUENCIES, occurrencesBetween } from './recurrenceSchedule.js';
+import { MAX_EVERY, NTH_VALUES, repeatDates, REPEAT_UNITS } from './repeatSchedule.js';
 import { normalizeTransactionInput, TRANSACTION_KINDS } from './transaction.js';
 import {
   checkRequiredText,
@@ -34,8 +41,9 @@ import {
 /** @typedef {import('./validation.js').BaseEntity} BaseEntity */
 /** @typedef {import('./validation.js').EntityContext} EntityContext */
 /** @typedef {import('./localDate.js').LocalDate} LocalDate */
-/** @typedef {import('./recurrenceSchedule.js').Frequency} Frequency */
-/** @typedef {import('./recurrenceSchedule.js').Schedule} Schedule */
+/** @typedef {import('./repeatSchedule.js').RepeatSchedule} RepeatSchedule */
+/** @typedef {import('./repeatSchedule.js').RepeatUnit} RepeatUnit */
+/** @typedef {import('./repeatSchedule.js').Nth} Nth */
 /** @typedef {import('./transaction.js').Transaction} Transaction */
 /** @typedef {import('./transaction.js').TransactionKind} TransactionKind */
 /** @typedef {import('./transaction.js').TransactionFields} TransactionFields */
@@ -45,7 +53,6 @@ export const MAX_TRIGGERS = 5;
 export const MAX_ACTIONS = 5;
 /** Items per condition group (top level or nested). */
 export const MAX_GROUP_ITEMS = 10;
-export const MAX_INTERVAL = 999;
 /** Maximum results written per automation in one run (catch-up cap). */
 export const RUN_CAP = 366;
 /** Basis points in 100%. */
@@ -109,14 +116,10 @@ const WORD_PATTERN = /\{([A-Za-z]+)\}/g;
 /** @typedef {(typeof MATCH_MODES)[number]} MatchMode */
 
 /**
- * @typedef {{
- *   type: 'schedule',
- *   frequency: Frequency,
- *   interval: number,
- *   firstDate: LocalDate,
- *   lastDayOfMonth: boolean,
- *   weekend: WeekendRule,
- * }} ScheduleTrigger
+ * A calendar-style repeat (D54): every N days, weeks (on weekdays), months (on a day or the Nth
+ * weekday), or years (on a date). `weekend` only applies to a day of the month and to years; it is
+ * stored as `keep` otherwise.
+ * @typedef {RepeatSchedule & { type: 'schedule', weekend: WeekendRule }} ScheduleTrigger
  */
 /** @typedef {{ type: 'transactionRecorded' }} TransactionTrigger */
 /** @typedef {ScheduleTrigger | TransactionTrigger} Trigger */
@@ -160,10 +163,13 @@ const WORD_PATTERN = /\{([A-Za-z]+)\}/g;
 /**
  * @typedef {object} TriggerInput
  * @property {string} type
- * @property {string} [frequency]
- * @property {number | string} [interval]
- * @property {string} [firstDate]
- * @property {boolean} [lastDayOfMonth]
+ * @property {number | string} [every]
+ * @property {string} [unit]
+ * @property {number | string} [phase]
+ * @property {Array<number | string>} [weekdays]
+ * @property {{ kind: string, day?: number | string, nth?: number | string, weekday?: number | string }} [monthDay]
+ * @property {number | string} [month]
+ * @property {number | string} [day]
  * @property {string} [weekend]
  */
 /**
@@ -256,29 +262,73 @@ function normalizeTrigger(input, path, errors) {
     errors[`${path}.type`] = 'validation.required';
     return { type: 'transactionRecorded' };
   }
-  const interval = Number(input.interval);
-  const frequency = input.frequency;
-  const lastDayOfMonth = input.lastDayOfMonth === true;
+  const every = Number(input.every);
+  const unit = input.unit;
+  const phase = Number(input.phase ?? 0);
+  const everyOk = inRange(every, 1, MAX_EVERY);
+  errors[`${path}.every`] = everyOk ? null : 'validation.every';
+  errors[`${path}.unit`] = isOneOf(unit, REPEAT_UNITS) ? null : 'validation.required';
+  errors[`${path}.phase`] = !everyOk || inRange(phase, 0, every - 1) ? null : 'validation.invalid';
   const weekend = input.weekend ?? 'keep';
-  errors[`${path}.frequency`] = isOneOf(frequency, FREQUENCIES) ? null : 'validation.required';
-  errors[`${path}.interval`] =
-    Number.isInteger(interval) && interval >= 1 && interval <= MAX_INTERVAL
-      ? null
-      : 'validation.interval';
-  errors[`${path}.firstDate`] = isLocalDate(input.firstDate) ? null : 'validation.date';
   errors[`${path}.weekend`] = isOneOf(weekend, WEEKEND_RULES) ? null : 'validation.required';
-  errors[`${path}.lastDayOfMonth`] =
-    lastDayOfMonth && frequency !== 'monthly' && frequency !== 'yearly'
-      ? 'validation.lastDayNeedsMonths'
-      : null;
-  return {
+  /** @type {ScheduleTrigger} */
+  const trigger = {
     type: 'schedule',
-    frequency: /** @type {Frequency} */ (frequency),
-    interval,
-    firstDate: /** @type {LocalDate} */ (input.firstDate),
-    lastDayOfMonth,
+    every,
+    unit: /** @type {RepeatUnit} */ (unit),
+    phase,
     weekend: /** @type {WeekendRule} */ (weekend),
   };
+  if (unit === 'week') {
+    const weekdays = [...new Set((input.weekdays ?? []).map(Number))].sort((x, y) => x - y);
+    errors[`${path}.weekdays`] =
+      weekdays.length === 0
+        ? 'validation.weekdays'
+        : weekdays.every((d) => inRange(d, 1, 7))
+          ? null
+          : 'validation.invalid';
+    return { ...trigger, weekdays, weekend: 'keep' };
+  }
+  if (unit === 'month') {
+    const monthDay = input.monthDay;
+    if (monthDay?.kind === 'weekday') {
+      const nth = Number(monthDay.nth);
+      const weekday = Number(monthDay.weekday);
+      errors[`${path}.nth`] = /** @type {readonly number[]} */ (NTH_VALUES).includes(nth)
+        ? null
+        : 'validation.required';
+      errors[`${path}.weekday`] = inRange(weekday, 1, 7) ? null : 'validation.required';
+      return {
+        ...trigger,
+        monthDay: { kind: 'weekday', nth: /** @type {Nth} */ (nth), weekday },
+        weekend: 'keep',
+      };
+    }
+    const day = Number(monthDay?.day);
+    errors[`${path}.day`] = inRange(day, 1, 31) ? null : 'validation.dayOfMonth';
+    return { ...trigger, monthDay: { kind: 'day', day } };
+  }
+  if (unit === 'year') {
+    const month = Number(input.month);
+    const day = Number(input.day);
+    errors[`${path}.month`] = inRange(month, 1, 12) ? null : 'validation.required';
+    errors[`${path}.day`] =
+      inRange(month, 1, 12) && !inRange(day, 1, daysInMonth(2024, month))
+        ? 'validation.dayOfMonth'
+        : null;
+    return { ...trigger, month, day };
+  }
+  return { ...trigger, weekend: 'keep' };
+}
+
+/**
+ * @param {number} value
+ * @param {number} min
+ * @param {number} max
+ * @returns {boolean} whether `value` is a whole number from `min` to `max`
+ */
+function inRange(value, min, max) {
+  return Number.isInteger(value) && value >= min && value <= max;
 }
 
 /**
@@ -630,20 +680,6 @@ function flattenConditions(group) {
 // --- Schedules --------------------------------------------------------------------------------
 
 /**
- * @param {ScheduleTrigger} trigger
- * @returns {Schedule}
- */
-function scheduleOf(trigger) {
-  return {
-    frequency: trigger.frequency,
-    interval: trigger.interval,
-    startDate: trigger.firstDate,
-    endDate: null,
-    ...(trigger.lastDayOfMonth ? { anchorDay: 31 } : {}),
-  };
-}
-
-/**
  * Moves a date off the weekend: `before` to the Friday before, `after` to the Monday after.
  * @param {LocalDate} date
  * @param {WeekendRule} rule
@@ -666,8 +702,7 @@ export function shiftForWeekend(date, rule) {
  * @returns {Array<{ planned: LocalDate, date: LocalDate }>}
  */
 export function scheduleDates(trigger, from, to, limit = Infinity) {
-  if (to < from) return [];
-  return occurrencesBetween(scheduleOf(trigger), from, to, limit).map((planned) => ({
+  return repeatDates(trigger, from, to, limit).map((planned) => ({
     planned,
     date: shiftForWeekend(planned, trigger.weekend),
   }));
@@ -711,18 +746,15 @@ export function landingDates(automation, from, to) {
 export function nextDate(automation, today) {
   /** @type {LocalDate | null} */
   let next = null;
-  const from = addDays(today, 1);
-  const lower = automation.startDate > from ? automation.startDate : from;
+  // A date planned up to two days before tomorrow may land after today (moved to a Monday), but
+  // nothing planned before the automation's start counts.
+  const early = addDays(today, 1 - WEEKEND_LOOKAHEAD_DAYS);
+  const lower = automation.startDate > early ? automation.startDate : early;
   for (const trigger of automation.triggers) {
     if (trigger.type !== 'schedule') continue;
     const upper = automation.endDate ?? '9999-12-31';
     // Look a few planned dates ahead: a shift may move one before another.
-    for (const { date } of scheduleDates(
-      trigger,
-      addDays(lower, -WEEKEND_LOOKAHEAD_DAYS),
-      upper,
-      3,
-    )) {
+    for (const { date } of scheduleDates(trigger, lower, upper, 3 + WEEKEND_LOOKAHEAD_DAYS)) {
       if (date > today && (next === null || date < next)) next = date;
     }
   }

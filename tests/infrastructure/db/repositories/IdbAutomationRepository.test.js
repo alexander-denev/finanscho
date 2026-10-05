@@ -15,10 +15,10 @@ const automation = {
   triggers: [
     {
       type: 'schedule',
-      frequency: 'monthly',
-      interval: 1,
-      firstDate: '2024-01-01',
-      lastDayOfMonth: false,
+      every: 1,
+      unit: 'month',
+      phase: 0,
+      monthDay: { kind: 'day', day: 1 },
       weekend: 'keep',
     },
   ],

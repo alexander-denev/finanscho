@@ -36,7 +36,14 @@ async function expectConverged(devices, options = {}) {
 const monthly = (accountId, firstDate, amount = '800') => ({
   name: 'Rent',
   startDate: firstDate,
-  triggers: [{ type: 'schedule', frequency: 'monthly', interval: 1, firstDate }],
+  triggers: [
+    {
+      type: 'schedule',
+      every: 1,
+      unit: 'month',
+      monthDay: { kind: 'day', day: Number(firstDate.slice(8)) },
+    },
+  ],
   actions: [
     {
       type: 'createTransaction',
@@ -206,7 +213,7 @@ describe('multi-device sync convergence', () => {
     const groceries = await a.services.automations.create({
       name: 'Groceries',
       startDate: '2024-05-01',
-      triggers: [{ type: 'schedule', frequency: 'monthly', interval: 1, firstDate: '2024-05-01' }],
+      triggers: [{ type: 'schedule', every: 1, unit: 'month', monthDay: { kind: 'day', day: 1 } }],
       actions: [
         {
           type: 'setBudget',
@@ -381,9 +388,11 @@ describe('multi-device sync convergence', () => {
               : [
                   {
                     type: 'schedule',
-                    frequency: rnd.pick(['daily', 'weekly', 'monthly']),
-                    interval: 1 + rnd.int(3),
-                    firstDate: '2024-04-20',
+                    every: 1 + rnd.int(3),
+                    phase: 0,
+                    unit: rnd.pick(['day', 'week', 'month']),
+                    weekdays: [1 + rnd.int(7)],
+                    monthDay: { kind: 'day', day: 1 + rnd.int(31) },
                     weekend: rnd.pick(['keep', 'before', 'after']),
                   },
                 ],

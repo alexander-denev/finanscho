@@ -1,23 +1,7 @@
 import { Icon } from '../../components/Icon.jsx';
 import { formatDate, t } from '../../i18n/i18n.js';
+import { describeTrigger } from './automationText.js';
 import styles from './AutomationRow.module.css';
-
-/** @typedef {import('../../../core/domain/automation.js').Trigger} Trigger */
-
-/**
- * Short words for one trigger, e.g. "Monthly", "Every 2 weeks", "Monthly, last day", or "When a
- * transaction is recorded".
- * @param {Trigger} trigger
- * @returns {string}
- */
-export function describeTrigger(trigger) {
-  if (trigger.type === 'transactionRecorded') return t('automations.summary.transactionRecorded');
-  const schedule =
-    trigger.interval === 1
-      ? t(`frequency.${trigger.frequency}`)
-      : t(`frequency.every.${trigger.frequency}`, { n: trigger.interval });
-  return trigger.lastDayOfMonth ? t('automations.summary.lastDay', { schedule }) : schedule;
-}
 
 /**
  * @typedef {object} AutomationRowProps

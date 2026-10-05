@@ -58,7 +58,7 @@ const rentInput = (over = {}) => ({
   name: 'Rent',
   startDate: '2026-01-01',
   endDate: null,
-  triggers: [{ type: 'schedule', frequency: 'monthly', interval: '1', firstDate: '2026-01-01' }],
+  triggers: [{ type: 'schedule', every: 1, unit: 'month', monthDay: { kind: 'day', day: 1 } }],
   conditions: null,
   actions: [
     {
@@ -154,10 +154,10 @@ const run = (over = {}) => ({
  */
 const schedule = (over) => ({
   type: 'schedule',
-  frequency: 'monthly',
-  interval: 1,
-  firstDate: '2026-01-01',
-  lastDayOfMonth: false,
+  every: 1,
+  unit: 'month',
+  phase: 0,
+  monthDay: { kind: 'day', day: 1 },
   weekend: 'keep',
   ...over,
 });
@@ -171,10 +171,10 @@ describe('automation input', () => {
       triggers: [
         {
           type: 'schedule',
-          frequency: 'monthly',
-          interval: 1,
-          firstDate: '2026-01-01',
-          lastDayOfMonth: false,
+          every: 1,
+          unit: 'month',
+          phase: 0,
+          monthDay: { kind: 'day', day: 1 },
           weekend: 'keep',
         },
       ],
@@ -256,13 +256,15 @@ describe('automation input', () => {
             name: ' ',
             endDate: '2025-12-31',
             triggers: [
+              { type: 'schedule', every: '0', unit: 'week', weekdays: [] },
               {
                 type: 'schedule',
-                frequency: 'weekly',
-                interval: '0',
-                firstDate: 'x',
-                lastDayOfMonth: true,
+                every: 2,
+                unit: 'month',
+                phase: 2,
+                monthDay: { kind: 'day', day: 32 },
               },
+              { type: 'schedule', every: 1, unit: 'year', month: 4, day: 31 },
               { type: 'transactionRecorded' },
               { type: 'transactionRecorded' },
             ],
@@ -274,9 +276,11 @@ describe('automation input', () => {
       name: 'validation.required',
       endDate: 'validation.endBeforeStart',
       triggers: 'validation.oneEventTrigger',
-      'triggers.0.interval': 'validation.interval',
-      'triggers.0.firstDate': 'validation.date',
-      'triggers.0.lastDayOfMonth': 'validation.lastDayNeedsMonths',
+      'triggers.0.every': 'validation.every',
+      'triggers.0.weekdays': 'validation.weekdays',
+      'triggers.1.phase': 'validation.invalid',
+      'triggers.1.day': 'validation.dayOfMonth',
+      'triggers.2.day': 'validation.dayOfMonth',
     });
   });
 
@@ -326,6 +330,37 @@ describe('automation input', () => {
     ]);
   });
 
+  it('keeps the weekend rule only where a date can fall on a weekend', () => {
+    const fields = normalizeAutomationInput(
+      rentInput({
+        triggers: [
+          { type: 'schedule', every: 1, unit: 'week', weekdays: [5, '1', 5], weekend: 'before' },
+          {
+            type: 'schedule',
+            every: 1,
+            unit: 'month',
+            monthDay: { kind: 'weekday', nth: '-1', weekday: '5' },
+            weekend: 'after',
+          },
+          { type: 'schedule', every: 1, unit: 'year', month: '2', day: '29', weekend: 'after' },
+        ],
+      }),
+      refs,
+    );
+    expect(fields.triggers).toEqual([
+      { type: 'schedule', every: 1, unit: 'week', phase: 0, weekdays: [1, 5], weekend: 'keep' },
+      {
+        type: 'schedule',
+        every: 1,
+        unit: 'month',
+        phase: 0,
+        monthDay: { kind: 'weekday', nth: -1, weekday: 5 },
+        weekend: 'keep',
+      },
+      { type: 'schedule', every: 1, unit: 'year', phase: 0, month: 2, day: 29, weekend: 'after' },
+    ]);
+  });
+
   it('lists unknown fill-in words', () => {
     expect(unknownWords('Rent {month} {Year} {payee} {x}')).toEqual(['Year', 'x']);
   });
@@ -342,9 +377,9 @@ describe('automation schedules', () => {
     expect(shiftForWeekend('2026-10-05', 'before')).toBe('2026-10-05');
   });
 
-  it('lands on the last day of each month, whatever the first date', () => {
+  it('lands on the last day of each month for day 31', () => {
     const dates = scheduleDates(
-      schedule({ firstDate: '2023-11-30', lastDayOfMonth: true }),
+      schedule({ monthDay: { kind: 'day', day: 31 } }),
       '2023-11-01',
       '2024-03-31',
     );
@@ -365,9 +400,9 @@ describe('automation schedules', () => {
         triggers: [
           {
             type: 'schedule',
-            frequency: 'monthly',
-            interval: '1',
-            firstDate: '2026-10-01',
+            every: 1,
+            unit: 'month',
+            monthDay: { kind: 'day', day: 1 },
             weekend: 'before',
           },
         ],
@@ -394,8 +429,8 @@ describe('automation schedules', () => {
       rentInput({
         startDate: '2026-09-01',
         triggers: [
-          { type: 'schedule', frequency: 'monthly', interval: '1', firstDate: '2026-09-01' },
-          { type: 'schedule', frequency: 'monthly', interval: '1', firstDate: '2026-09-15' },
+          { type: 'schedule', every: 1, unit: 'month', monthDay: { kind: 'day', day: 1 } },
+          { type: 'schedule', every: 1, unit: 'month', monthDay: { kind: 'day', day: 15 } },
         ],
         actions: [
           ...rentInput().actions,

@@ -51,7 +51,7 @@ describe('DashboardPage', () => {
     await ui.stores.automations.create({
       name: 'Streaming',
       startDate: '2024-05-25',
-      triggers: [{ type: 'schedule', frequency: 'monthly', interval: 1, firstDate: '2024-05-25' }],
+      triggers: [{ type: 'schedule', every: 1, unit: 'month', monthDay: { kind: 'day', day: 25 } }],
       actions: [
         {
           type: 'createTransaction',

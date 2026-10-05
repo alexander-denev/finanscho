@@ -57,7 +57,7 @@ describe('BudgetsPage', () => {
     await ui.stores.automations.create({
       name: 'Dining',
       startDate: '2024-05-01',
-      triggers: [{ type: 'schedule', frequency: 'monthly', interval: 1, firstDate: '2024-05-01' }],
+      triggers: [{ type: 'schedule', every: 1, unit: 'month', monthDay: { kind: 'day', day: 1 } }],
       actions: [
         { type: 'setBudget', categoryId: 'seed:dining', amount: { type: 'fixed', value: '80' } },
       ],

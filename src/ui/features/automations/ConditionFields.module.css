@@ -12,3 +12,14 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--field-min)), 1fr));
   gap: var(--sp-3);
 }
+
+.lone {
+  display: block;
+}
+
+.fixed {
+  align-self: end;
+  min-height: var(--tap);
+  padding-top: var(--sp-3);
+  font-weight: var(--fw-strong);
+}

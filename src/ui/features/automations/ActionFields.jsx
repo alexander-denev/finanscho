@@ -1,5 +1,4 @@
-import { ACTION_TYPES, AMOUNT_TYPES } from '../../../core/domain/automation.js';
-import { Button } from '../../components/Button.jsx';
+import { AMOUNT_TYPES } from '../../../core/domain/automation.js';
 import { MoneyInput } from '../../components/MoneyInput.jsx';
 import { SegmentedControl } from '../../components/SegmentedControl.jsx';
 import { Select } from '../../components/Select.jsx';
@@ -16,7 +15,6 @@ import styles from './ActionFields.module.css';
  * @property {ActionDraft} value
  * @property {Record<string, string>} errors this step's errors (path prefix removed)
  * @property {(patch: Partial<ActionDraft>) => void} onChange
- * @property {(() => void) | null} onRemove null when it is the only step
  * @property {boolean} allowPercent every trigger is "a transaction is recorded"
  * @property {readonly { id: string, name: string, currency: string }[]} accounts
  * @property {readonly { id: string, name: string, kind: string }[]} categories
@@ -35,19 +33,12 @@ function appendWord(text, word) {
 
 /**
  * One "Do" step: create a transaction (the usual transaction fields, a fixed amount or a share
- * of the recorded transaction, and fill-in words in payee and note) or set a budget.
+ * of the recorded transaction, and fill-in words in payee and note) or set a budget. The kind of
+ * step was chosen when it was added and doesn't change.
  * @param {ActionFieldsProps} props
  * @returns {import('preact').JSX.Element}
  */
-export function ActionFields({
-  value,
-  errors,
-  onChange,
-  onRemove,
-  allowPercent,
-  accounts,
-  categories,
-}) {
+export function ActionFields({ value, errors, onChange, allowPercent, accounts, categories }) {
   /**
    * @param {string} field
    * @returns {string | null}
@@ -98,27 +89,7 @@ export function ActionFields({
   );
 
   return (
-    <div className={styles.card}>
-      <div className={styles.head}>
-        <Select
-          label={t('automations.actionType')}
-          value={value.type}
-          options={ACTION_TYPES.map((type) => ({
-            value: type,
-            label: t(`automations.action.${type}`),
-          }))}
-          error={error('type')}
-          onChange={(type) => onChange({ type: /** @type {ActionDraft['type']} */ (type) })}
-        />
-        {onRemove && (
-          <Button
-            variant="ghost"
-            icon="trash"
-            aria-label={t('automations.removeAction')}
-            onClick={onRemove}
-          />
-        )}
-      </div>
+    <div className={styles.root}>
       {value.type === 'setBudget' ? (
         <>
           <Select

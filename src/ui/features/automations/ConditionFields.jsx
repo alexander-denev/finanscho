@@ -1,4 +1,4 @@
-import { CONDITION_FIELDS, CONDITION_OPS } from '../../../core/domain/automation.js';
+import { CONDITION_OPS } from '../../../core/domain/automation.js';
 import { TRANSACTION_KINDS } from '../../../core/domain/transaction.js';
 import { Button } from '../../components/Button.jsx';
 import { MoneyInput } from '../../components/MoneyInput.jsx';
@@ -21,12 +21,13 @@ import styles from './ConditionFields.module.css';
  * @property {ConditionDraft} value
  * @property {Record<string, string>} errors this check's errors (path prefix removed)
  * @property {(patch: Partial<ConditionDraft>) => void} onChange
- * @property {() => void} onRemove
+ * @property {(() => void) | null} onRemove shown inside a group; a lone check is removed from its window
  * @property {ConditionPickers} pickers
  */
 
 /**
- * One check on the recorded transaction: what to look at, how to compare, and the value.
+ * One check on the recorded transaction: how to compare, and the value. What it looks at (the
+ * field) was chosen when the check was added and doesn't change.
  * @param {ConditionFieldsProps} props
  * @returns {import('preact').JSX.Element}
  */
@@ -115,34 +116,35 @@ export function ConditionFields({ value, errors, onChange, onRemove, pickers }) 
   };
 
   return (
-    <div className={styles.row}>
+    <div className={onRemove ? styles.row : styles.lone}>
       <div className={styles.fields}>
-        <Select
-          label={t('automations.check')}
-          value={value.field}
-          options={CONDITION_FIELDS.map((f) => ({ value: f, label: t(`automations.field.${f}`) }))}
-          onChange={(next) =>
-            onChange({
-              field: next,
-              op: CONDITION_OPS[/** @type {keyof typeof CONDITION_OPS} */ (next)][0],
-            })
-          }
-        />
-        <Select
-          label={t('automations.op')}
-          value={value.op}
-          options={ops.map((op) => ({ value: op, label: t(`automations.op.${op}`) }))}
-          error={error('op')}
-          onChange={(op) => onChange({ op })}
-        />
+        {ops.length > 1 ? (
+          <Select
+            label={t(`automations.field.${field}`)}
+            value={value.op}
+            options={ops.map((op) => ({ value: op, label: t(`automations.op.${op}`) }))}
+            error={error('op')}
+            onChange={(op) => onChange({ op })}
+          />
+        ) : (
+          <p className={styles.fixed}>
+            {t('automations.text.check', {
+              what: t(`automations.field.${field}`),
+              how: t(`automations.op.${ops[0]}`),
+              value: '',
+            })}
+          </p>
+        )}
         {valueControl()}
       </div>
-      <Button
-        variant="ghost"
-        icon="trash"
-        aria-label={t('automations.removeCheck')}
-        onClick={onRemove}
-      />
+      {onRemove && (
+        <Button
+          variant="ghost"
+          icon="trash"
+          aria-label={t('automations.removeCheck')}
+          onClick={onRemove}
+        />
+      )}
     </div>
   );
 }

@@ -1,0 +1,10 @@
+.loading {
+  color: var(--c-muted);
+}
+
+.error {
+  width: 100%;
+  font-size: var(--fs-sm);
+  color: var(--c-brick);
+  font-weight: var(--fw-strong);
+}

@@ -29,15 +29,7 @@ describe('AutomationService', () => {
   const rent = (over = {}) => ({
     name: 'Rent',
     startDate: '2024-01-31',
-    triggers: [
-      {
-        type: 'schedule',
-        frequency: 'monthly',
-        interval: 1,
-        firstDate: '2024-01-31',
-        lastDayOfMonth: true,
-      },
-    ],
+    triggers: [{ type: 'schedule', every: 1, unit: 'month', monthDay: { kind: 'day', day: 31 } }],
     actions: [
       {
         type: 'createTransaction',
@@ -207,9 +199,9 @@ describe('AutomationService', () => {
     action.amount = { type: 'fixed', value: '850' };
     input.triggers.push({
       type: 'schedule',
-      frequency: 'weekly',
-      interval: 1,
-      firstDate: '2024-01-01',
+      every: 1,
+      unit: 'week',
+      weekdays: [1],
     });
     const edited = await t.services.automations.edit(automation.id, input);
     expect(edited.id).toBe(automation.id);
@@ -261,7 +253,7 @@ describe('AutomationService', () => {
         name: 'Groceries budget',
         startDate: '2024-03-01',
         triggers: [
-          { type: 'schedule', frequency: 'monthly', interval: 1, firstDate: '2024-03-01' },
+          { type: 'schedule', every: 1, unit: 'month', monthDay: { kind: 'day', day: 1 } },
         ],
         actions: [
           {
@@ -309,9 +301,9 @@ describe('AutomationService', () => {
         triggers: [
           {
             type: 'schedule',
-            frequency: 'monthly',
-            interval: 1,
-            firstDate: '2024-06-01',
+            every: 1,
+            unit: 'month',
+            monthDay: { kind: 'day', day: 1 },
             weekend: 'before',
           },
         ],
@@ -335,7 +327,7 @@ describe('AutomationService', () => {
     const automation = await t.services.automations.create(
       rent({
         startDate: '2022-01-01',
-        triggers: [{ type: 'schedule', frequency: 'daily', interval: 1, firstDate: '2022-01-01' }],
+        triggers: [{ type: 'schedule', every: 1, unit: 'day' }],
       }),
     );
     expect(await made(automation.id)).toHaveLength(366);

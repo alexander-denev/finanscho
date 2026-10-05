@@ -52,7 +52,7 @@ describe('CategoryService', () => {
     await t.services.automations.create({
       name: 'Monthly',
       startDate: '2024-06-01',
-      triggers: [{ type: 'schedule', frequency: 'monthly', interval: 1, firstDate: '2024-06-01' }],
+      triggers: [{ type: 'schedule', every: 1, unit: 'month', monthDay: { kind: 'day', day: 1 } }],
       actions: [
         {
           type: 'createTransaction',
