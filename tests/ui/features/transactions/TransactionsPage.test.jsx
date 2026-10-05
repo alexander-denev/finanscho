@@ -3,7 +3,11 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/preact';
 import { TransactionsPage } from '../../../../src/ui/features/transactions/TransactionsPage.jsx';
 import { createUiStores, renderWithStores } from '../../../helpers/renderWithStores.jsx';
 
-async function setup() {
+/**
+ * @param {(ui: Awaited<ReturnType<typeof createUiStores>>, accountId: string) => Promise<void>} [seed]
+ *   writes data before the page renders, so a big seed doesn't re-render it once per record
+ */
+async function setup(seed) {
   const ui = await createUiStores({ path: '/transactions' });
   const account = await ui.stores.accounts.create({
     name: 'Main',
@@ -11,6 +15,7 @@ async function setup() {
     currency: 'EUR',
     openingBalance: '100',
   });
+  if (seed) await seed(ui, account.id);
   await ui.settled();
   renderWithStores(<TransactionsPage />, ui.stores);
   return { ...ui, account };
@@ -168,17 +173,17 @@ describe('TransactionsPage', () => {
   });
 
   it('filters by category and pages long lists', async () => {
-    const ui = await setup();
-    for (let i = 1; i <= 55; i += 1) {
-      await ui.stores.transactions.save({
-        kind: 'expense',
-        date: `2024-04-${String((i % 28) + 1).padStart(2, '0')}`,
-        amount: String(i),
-        accountId: ui.account.id,
-        categoryId: i === 3 ? 'seed:travel' : 'seed:groceries',
-      });
-    }
-    await ui.settled();
+    await setup(async (ui, accountId) => {
+      for (let i = 1; i <= 55; i += 1) {
+        await ui.services.transactions.create({
+          kind: 'expense',
+          date: `2024-04-${String((i % 28) + 1).padStart(2, '0')}`,
+          amount: String(i),
+          accountId,
+          categoryId: i === 3 ? 'seed:travel' : 'seed:groceries',
+        });
+      }
+    });
     await screen.findByRole('button', { name: 'Load more' });
     expect(screen.getAllByRole('listitem')).toHaveLength(50);
     fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
