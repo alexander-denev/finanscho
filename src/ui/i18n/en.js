@@ -154,6 +154,8 @@ export const EN = Object.freeze({
   'toast.transactionDeleted': 'Transaction deleted.',
   'toast.accountSaved': 'Account saved.',
   'toast.accountDeleted': 'Account deleted.',
+  'toast.reconciled': 'Balance adjusted by {amount}.',
+  'toast.reconcileMatched': 'The balance already matches. Nothing was recorded.',
   'toast.categorySaved': 'Category saved.',
   'toast.categoryDeleted': 'Category deleted.',
   'toast.budgetSaved': 'Budget saved.',
@@ -219,6 +221,12 @@ export const EN = Object.freeze({
   'accounts.empty.title': 'No accounts yet',
   'accounts.empty.body': 'Add an account to start tracking money in and out.',
   'accounts.viewTransactions': 'View transactions',
+  'reconcile.title': 'Reconcile balance',
+  'reconcile.balanceToday': 'Balance in the app today',
+  'reconcile.actualBalance': 'Actual balance',
+  'reconcile.hint':
+    'What your bank or wallet shows now. The difference is recorded as a balance adjustment dated today. It isn’t counted as income or spending.',
+  'reconcile.save': 'Reconcile',
 
   'categories.title': 'Categories',
   'categories.add': 'Add category',
@@ -261,6 +269,9 @@ export const EN = Object.freeze({
   'transactions.allAccounts': 'All accounts',
   'transactions.allCategories': 'All categories',
   'transactions.uncategorized': 'Uncategorized',
+  'transactions.adjustment': 'Balance adjustment',
+  'transactions.adjustmentNote':
+    'This balance adjustment changes the balance but isn’t counted as income or spending. Give it a category once you know what it was, and it will count like any other transaction.',
   'transactions.allMonths': 'All months',
   'transactions.clearFilters': 'Clear filters',
   'transactions.total': 'Net of shown transactions',

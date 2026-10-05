@@ -109,7 +109,8 @@ export class TransactionService {
 
   /**
    * Writes only the fields that changed, so concurrent edits to other fields on another device
-   * are preserved by the per-field merge.
+   * are preserved by the per-field merge. Giving a balance adjustment a category (or making it a
+   * transfer) turns it into an ordinary transaction that counts as income or spending.
    * @param {string} id
    * @param {TransactionInput} input
    * @returns {Promise<void>}
@@ -121,6 +122,9 @@ export class TransactionService {
     const changes = {};
     for (const field of EDITABLE_FIELDS) {
       if (fields[field] !== existing[field]) Object.assign(changes, { [field]: fields[field] });
+    }
+    if (existing.adjustment && (fields.categoryId !== null || fields.kind === 'transfer')) {
+      changes.adjustment = false;
     }
     if (Object.keys(changes).length === 0) return;
     await this.#transactions.update(id, { ...changes, updatedAt: this.#clock.nowIso() });

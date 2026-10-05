@@ -16,7 +16,7 @@ import { firstDayOfMonth, lastDayOfMonth, yearMonthOf } from '../domain/localDat
  * @property {string} month 'YYYY-MM'
  * @property {AccountBalance[]} balances active accounts
  * @property {CurrencyAmount[]} totals balance totals per currency
- * @property {{ currency: string, incomeMinor: number, expenseMinor: number }[]} monthFlow this month's income and expense per currency (transfers excluded)
+ * @property {{ currency: string, incomeMinor: number, expenseMinor: number }[]} monthFlow this month's income and expense per currency (transfers and balance adjustments excluded)
  * @property {{ lines: BudgetLine[], over: number, near: number }} budgets this month's budget status
  * @property {UpcomingOccurrence[]} upcoming recurring occurrences in the next 30 days
  */
@@ -72,7 +72,8 @@ export class DashboardService {
     const expense = new Map();
     for (const tx of monthTx) {
       const currency = currencyOf.get(tx.accountId);
-      if (!currency) continue;
+      // Balance adjustments correct the balance; they are not money earned or spent this month.
+      if (!currency || tx.adjustment) continue;
       if (tx.kind === 'income') add(income, currency, tx.amountMinor);
       if (tx.kind === 'expense') add(expense, currency, tx.amountMinor);
     }

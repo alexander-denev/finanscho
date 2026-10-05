@@ -19,7 +19,9 @@ export const TRANSACTION_KINDS = /** @type {const} */ (['expense', 'income', 'tr
 /**
  * A transaction. `amountMinor` is always positive; its sign is derived from `kind`.
  * Transfers move money from `accountId` to `toAccountId` and have no category. Income and
- * expenses may be uncategorized (`categoryId` null) until the user assigns one.
+ * expenses may be uncategorized (`categoryId` null) until the user assigns one. `adjustment` marks
+ * a balance adjustment recorded by reconciling an account (absent on other transactions): it
+ * counts in balances but not in month income or spending.
  * @typedef {BaseEntity & {
  *   kind: TransactionKind,
  *   date: LocalDate,
@@ -30,6 +32,7 @@ export const TRANSACTION_KINDS = /** @type {const} */ (['expense', 'income', 'tr
  *   payee: string,
  *   note: string,
  *   recurringRuleId: string | null,
+ *   adjustment?: boolean,
  * }} Transaction
  */
 
@@ -143,6 +146,40 @@ export function createTransaction(fields, ctx, recurringRuleId = null) {
     updatedAt: ctx.now,
     deleted: false,
   };
+}
+
+/**
+ * Builds the balance adjustment that reconciles an account with the balance the user counted: an
+ * uncategorized income or expense for the difference. The counted balance may be negative (card
+ * debt). Returns null when the balances already match.
+ * @param {{ accountId: string, currency: string, bookMinor: number, actual: string, date: LocalDate }} input
+ *   `bookMinor` is the computed balance on `date`; `actual` is the counted balance as typed
+ * @param {EntityContext} ctx
+ * @returns {Transaction | null}
+ * @throws {import('../errors.js').ValidationError}
+ */
+export function createBalanceAdjustment(input, ctx) {
+  const actual = parseMoney(input.actual, input.currency, { allowNegative: true });
+  throwIfInvalid({ balance: actual.ok ? null : `validation.money.${actual.error}` });
+  const differenceMinor = (actual.ok ? actual.minor : 0) - input.bookMinor;
+  throwIfInvalid({
+    balance: Number.isSafeInteger(differenceMinor) ? null : 'validation.money.tooLarge',
+  });
+  if (differenceMinor === 0) return null;
+  const transaction = createTransaction(
+    {
+      kind: differenceMinor > 0 ? 'income' : 'expense',
+      date: input.date,
+      amountMinor: Math.abs(differenceMinor),
+      accountId: input.accountId,
+      toAccountId: null,
+      categoryId: null,
+      payee: '',
+      note: '',
+    },
+    ctx,
+  );
+  return { ...transaction, adjustment: true };
 }
 
 /**

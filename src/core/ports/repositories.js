@@ -61,7 +61,7 @@
  * @property {(id: string) => Promise<Transaction | null>} get
  * @property {(query: TransactionQuery) => Promise<{ items: Transaction[], hasMore: boolean }>} query newest first
  * @property {(from: LocalDate, to: LocalDate) => Promise<Transaction[]>} listInRange inclusive; use only for bounded ranges (a month)
- * @property {(accountId: string) => Promise<number>} netForAccount signed sum of all effects on the account
+ * @property {(accountId: string, through?: LocalDate) => Promise<number>} netForAccount signed sum of all effects on the account; with `through`, only of transactions dated on or before that day
  * @property {(accountId: string) => Promise<boolean>} hasAnyForAccount whether a visible transaction uses the account on either side
  * @property {(categoryId: string) => Promise<boolean>} hasAnyForCategory whether a visible transaction uses the category
  * @property {(limit: number) => Promise<PayeeSuggestion[]>} recentPayees distinct payees (case-insensitive), most recently used first, from a bounded scan of recent transactions

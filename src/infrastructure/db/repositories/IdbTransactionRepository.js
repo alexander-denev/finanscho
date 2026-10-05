@@ -32,7 +32,10 @@ function matches(tx, query, needle) {
     return false;
   }
   if (query.categoryId && tx.categoryId !== query.categoryId) return false;
-  if (query.uncategorized && (tx.kind === 'transfer' || tx.categoryId)) return false;
+  // Balance adjustments have no category on purpose; they are not waiting to be categorized.
+  if (query.uncategorized && (tx.kind === 'transfer' || tx.categoryId || tx.adjustment)) {
+    return false;
+  }
   if (needle && !`${tx.payee}\n${tx.note}`.toLowerCase().includes(needle)) return false;
   return true;
 }
@@ -123,16 +126,17 @@ export class IdbTransactionRepository {
    * Signed sum of every visible transaction's effect on the account, streamed through the
    * `accountId` and `toAccountId` indexes without loading the full history.
    * @param {string} accountId
+   * @param {string} [through] only transactions dated on or before this day
    * @returns {Promise<number>}
    */
-  async netForAccount(accountId) {
+  async netForAccount(accountId, through) {
     const store = this.#db.transaction(STORES.transactions).store;
     let total = 0;
     for (const indexName of [TX_INDEXES.accountId, TX_INDEXES.toAccountId]) {
       let cursor = await store.index(indexName).openCursor(accountId);
       while (cursor) {
         const record = /** @type {StoredRecord} */ (cursor.value);
-        if (isVisible(record)) {
+        if (isVisible(record) && (through === undefined || String(record.date) <= through)) {
           const tx = /** @type {Transaction} */ (toEntity(record));
           // A transfer appears in both indexes: the source side here, the destination side there.
           if (indexName === TX_INDEXES.accountId) {

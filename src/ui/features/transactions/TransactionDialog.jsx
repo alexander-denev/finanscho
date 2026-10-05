@@ -50,6 +50,7 @@ export function TransactionDialog({ request, onClose }) {
     /** @type {import('../../components/TransactionFields.jsx').PayeeSuggestion[]} */ ([]),
   );
   const confirmDelete = useSignal(false);
+  const isAdjustment = useSignal(false);
   const editingId = request.value?.id ?? null;
 
   // Reactive effect: prepare the draft whenever a new request arrives.
@@ -57,11 +58,13 @@ export function TransactionDialog({ request, onClose }) {
     const current = request.value;
     initial.value = null;
     loadError.value = null;
+    isAdjustment.value = false;
     if (!current) return;
     let cancelled = false;
     const load = async () => {
       if (current.id) {
         const tx = await transactions.get(current.id);
+        if (!cancelled) isAdjustment.value = tx.adjustment === true;
         const currency = accounts.byId.peek().get(tx.accountId)?.currency ?? 'EUR';
         return {
           kind: tx.kind,
@@ -148,6 +151,9 @@ export function TransactionDialog({ request, onClose }) {
           >
             {t('transactions.needAccount')}
           </InlineMessage>
+        )}
+        {initial.value && isAdjustment.value && (
+          <InlineMessage>{t('transactions.adjustmentNote')}</InlineMessage>
         )}
         {initial.value && (activeAccounts.length > 0 || editingId) && (
           <TransactionForm

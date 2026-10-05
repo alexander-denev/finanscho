@@ -1,4 +1,5 @@
 import { accountEdits, createAccount } from '../domain/account.js';
+import { createBalanceAdjustment } from '../domain/transaction.js';
 import { InUseError, NotFoundError } from '../errors.js';
 
 /** @typedef {import('../domain/account.js').Account} Account */
@@ -66,6 +67,47 @@ export class AccountService {
           account.openingBalanceMinor + (await this.#transactions.netForAccount(account.id)),
       })),
     );
+  }
+
+  /**
+   * The balance at the end of today: opening balance plus every transaction dated today or
+   * earlier. Future-dated transactions haven't happened yet.
+   * @param {string} id
+   * @returns {Promise<number>}
+   * @throws {NotFoundError}
+   */
+  async balanceToday(id) {
+    const account = await this.get(id);
+    const net = await this.#transactions.netForAccount(id, this.#clock.today());
+    return account.openingBalanceMinor + net;
+  }
+
+  /**
+   * Reconciles the account with the balance the user counted today: records one balance
+   * adjustment for the difference, so the history before it stays as it was.
+   * @param {string} id
+   * @param {{ balance: string }} input the counted balance as typed
+   * @returns {Promise<{ differenceMinor: number }>} 0 when it already matched (nothing recorded)
+   * @throws {NotFoundError | import('../errors.js').ValidationError}
+   */
+  async reconcile(id, input) {
+    const account = await this.get(id);
+    const adjustment = createBalanceAdjustment(
+      {
+        accountId: id,
+        currency: account.currency,
+        bookMinor: await this.balanceToday(id),
+        actual: input.balance,
+        date: this.#clock.today(),
+      },
+      { id: this.#ids.newId(), now: this.#clock.nowIso() },
+    );
+    if (adjustment === null) return { differenceMinor: 0 };
+    await this.#transactions.create(adjustment);
+    return {
+      differenceMinor:
+        adjustment.kind === 'income' ? adjustment.amountMinor : -adjustment.amountMinor,
+    };
   }
 
   /**

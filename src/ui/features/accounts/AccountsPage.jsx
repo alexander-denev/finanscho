@@ -10,17 +10,19 @@ import { EmptyState } from '../../components/EmptyState.jsx';
 import { InlineMessage } from '../../components/InlineMessage.jsx';
 import { PageHeader } from '../../components/PageHeader.jsx';
 import { SegmentedControl } from '../../components/SegmentedControl.jsx';
-import { errorMessage, t } from '../../i18n/i18n.js';
+import { errorMessage, formatMoney, t } from '../../i18n/i18n.js';
 import { AccountForm } from './AccountForm.jsx';
 import styles from './AccountsPage.module.css';
+import { ReconcileForm } from './ReconcileForm.jsx';
 
 /** @typedef {import('./AccountForm.jsx').AccountDraft} AccountDraft */
+/** @typedef {import('./ReconcileForm.jsx').ReconcileDraft} ReconcileDraft */
 
 /** The route that opens the add dialog, linked from outside the Accounts page. */
 const ADD_PATH = '/accounts/new';
 
 /**
- * Accounts with balances; add, edit, archive, restore, and delete unused ones. Archived accounts
+ * Accounts with balances; add, edit, reconcile, archive, restore, and delete unused ones. Archived accounts
  * live on their own tab, shown once there is one. On `/accounts/new` the add dialog opens at once.
  * @returns {import('preact').JSX.Element}
  */
@@ -31,6 +33,7 @@ export function AccountsPage() {
   const confirmDelete = useSignal(false);
   const deleteBlocked = useSignal(false);
   const deleteError = useSignal(/** @type {string | null} */ (null));
+  const reconciling = useSignal(/** @type {{ balanceTodayMinor: number } | null} */ (null));
   const adding = router.currentPath.value === ADD_PATH;
   const request = adding ? { id: null } : editing.value;
   const editingId = request?.id ?? null;
@@ -60,6 +63,7 @@ export function AccountsPage() {
     confirmDelete.value = false;
     deleteBlocked.value = false;
     deleteError.value = null;
+    reconciling.value = null;
     if (router.currentPath.peek() === ADD_PATH) router.navigate('/accounts');
   };
 
@@ -107,6 +111,29 @@ export function AccountsPage() {
     }
     await dropFilterOn(editingId);
     toasts.show('toast.accountDeleted');
+    close();
+  };
+
+  const askReconcile = async () => {
+    if (!editingId) return;
+    deleteError.value = null;
+    try {
+      reconciling.value = { balanceTodayMinor: await accounts.balanceToday(editingId) };
+    } catch (error) {
+      deleteError.value = errorMessage(error);
+    }
+  };
+
+  /** @param {ReconcileDraft} draft */
+  const reconcile = async (draft) => {
+    if (!editingId || !account) return;
+    const { differenceMinor } = await accounts.reconcile(editingId, draft);
+    if (differenceMinor === 0) toasts.show('toast.reconcileMatched');
+    else {
+      toasts.show('toast.reconciled', {
+        amount: formatMoney(differenceMinor, account.currency, { signDisplay: 'always' }),
+      });
+    }
     close();
   };
 
@@ -216,7 +243,7 @@ export function AccountsPage() {
         </>
       )}
       <Dialog
-        open={request !== null && !confirmDelete.value}
+        open={request !== null && !confirmDelete.value && reconciling.value === null}
         title={editingId ? t('accounts.edit') : t('accounts.add')}
         onClose={close}
       >
@@ -229,9 +256,14 @@ export function AccountsPage() {
             account && (
               <>
                 {!account.archived && (
-                  <Button variant="ghost" onClick={() => void viewTransactions()}>
-                    {t('accounts.viewTransactions')}
-                  </Button>
+                  <>
+                    <Button variant="ghost" onClick={() => void viewTransactions()}>
+                      {t('accounts.viewTransactions')}
+                    </Button>
+                    <Button variant="ghost" onClick={() => void askReconcile()}>
+                      {t('reconcile.title')}
+                    </Button>
+                  </>
                 )}
                 <Button variant="danger" onClick={() => void setArchived(!account.archived)}>
                   {account.archived ? t('common.unarchive') : t('common.archive')}
@@ -255,6 +287,22 @@ export function AccountsPage() {
         )}
         {account && !account.archived && (
           <p className={styles.note}>{t('accounts.archiveConfirm')}</p>
+        )}
+      </Dialog>
+      <Dialog
+        open={request !== null && reconciling.value !== null}
+        title={t('reconcile.title')}
+        onClose={close}
+      >
+        {account && reconciling.value && (
+          <ReconcileForm
+            balanceTodayMinor={reconciling.value.balanceTodayMinor}
+            currency={account.currency}
+            onSubmit={reconcile}
+            onCancel={() => {
+              reconciling.value = null;
+            }}
+          />
         )}
       </Dialog>
       <ConfirmDialog

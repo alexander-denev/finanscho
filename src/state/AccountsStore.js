@@ -126,6 +126,24 @@ export class AccountsStore {
 
   /**
    * @param {string} id
+   * @returns {Promise<number>} the balance at the end of today, in minor units
+   */
+  balanceToday(id) {
+    return this.#service.balanceToday(id);
+  }
+
+  /**
+   * Records a balance adjustment so the account matches the balance the user counted today.
+   * @param {string} id
+   * @param {{ balance: string }} input
+   * @returns {Promise<{ differenceMinor: number }>} 0 when it already matched
+   */
+  reconcile(id, input) {
+    return this.#service.reconcile(id, input);
+  }
+
+  /**
+   * @param {string} id
    * @returns {Promise<boolean>} whether the account can be deleted (nothing uses it)
    */
   async canRemove(id) {

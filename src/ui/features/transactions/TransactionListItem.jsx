@@ -27,16 +27,17 @@ export function TransactionListItem({
   onSelect,
 }) {
   const isTransfer = transaction.kind === 'transfer';
+  const uncategorizedLabel = transaction.adjustment
+    ? t('transactions.adjustment')
+    : t('transactions.uncategorized');
   const title =
     transaction.payee ||
     (isTransfer ? t('transactions.transferTo', { account: toAccountName }) : category?.name) ||
-    t(`kind.${transaction.kind}`);
+    (transaction.adjustment ? t('transactions.adjustment') : t(`kind.${transaction.kind}`));
   const details = [
     isTransfer
       ? `${accountName} → ${toAccountName}`
-      : [category?.name ?? t('transactions.uncategorized'), accountName]
-          .filter(Boolean)
-          .join(' · '),
+      : [category?.name ?? uncategorizedLabel, accountName].filter(Boolean).join(' · '),
     transaction.note,
   ].filter(Boolean);
 
