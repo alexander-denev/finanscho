@@ -786,3 +786,14 @@ icons visible wherever accounts and categories are shown or picked.
   in transaction rows (transfers, balance adjustments and uncategorized entries get gray arrows,
   scales and a question mark), balances, budgets, the dashboard, categories, and payee
   suggestions.
+
+### D57. Random IDs work outside secure contexts
+
+- **Problem:** `crypto.randomUUID()` exists only in secure contexts (HTTPS or `localhost`). A
+  `vite --host` dev server opened by LAN address (`http://192.168.x.x:5173`) is not one, so the
+  first device ID threw at startup and the app showed the "can't open its storage" screen.
+- **Decision:** `shared/randomUuid.js` uses `randomUUID` when present and otherwise builds a
+  version 4 UUID from `crypto.getRandomValues`, which works everywhere. `UuidGenerator` and the
+  automation editor's item keys use it. IDs keep the same format, so sync is unaffected.
+- **Still HTTPS-only over a LAN address:** the service worker (offline use, install) and
+  persistent storage. Production is served over HTTPS, so this only affects testing on a phone.

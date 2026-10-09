@@ -7,6 +7,7 @@
 import { CONDITION_OPS } from '../../../core/domain/automation.js';
 import { toDecimalString } from '../../../core/domain/money.js';
 import { isoWeekday, phaseFor, roundsUntil } from '../../../core/domain/repeatSchedule.js';
+import { randomUuid } from '../../../shared/randomUuid.js';
 
 /** @typedef {import('../../../core/domain/automation.js').Automation} Automation */
 /** @typedef {import('../../../core/domain/automation.js').AutomationInput} AutomationInput */
@@ -76,7 +77,7 @@ import { isoWeekday, phaseFor, roundsUntil } from '../../../core/domain/repeatSc
 
 /** @returns {string} a key for a new list item */
 function newKey() {
-  return globalThis.crypto.randomUUID();
+  return randomUuid();
 }
 
 /**
