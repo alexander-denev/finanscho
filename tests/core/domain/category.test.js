@@ -22,13 +22,16 @@ describe('category', () => {
 
   it('validates required fields', () => {
     expect(
-      fieldErrors(() => createCategory({ name: ' ', kind: 'x', color: 'x', icon: 'x' }, ctx)),
+      fieldErrors(() => createCategory({ name: ' ', kind: 'x', color: '', icon: '' }, ctx)),
     ).toEqual({
       name: 'validation.required',
       kind: 'validation.required',
       color: 'validation.required',
       icon: 'validation.required',
     });
+    expect(
+      fieldErrors(() => createCategory({ name: 'A', kind: 'expense', color: 'x', icon: 'x' }, ctx)),
+    ).toEqual({ color: 'validation.invalid', icon: 'validation.invalid' });
   });
 
   it('builds deterministic seed categories', () => {
@@ -39,5 +42,16 @@ describe('category', () => {
     expect(new Set(a.map((c) => c.id)).size).toBe(a.length);
     expect(a.some((c) => c.kind === 'income')).toBe(true);
     expect(a.find((c) => c.id === 'seed:groceries')?.createdAt).toBe('1970-01-01T00:00:00.000Z');
+  });
+
+  it('keeps an icon or color this version does not know when renaming', () => {
+    const synced = {
+      ...createCategory({ name: 'A', kind: 'expense', color: 'teal', icon: 'cart' }, ctx),
+      icon: /** @type {any} */ ('hovercraft'),
+      color: '#123456',
+    };
+    expect(
+      categoryEdits(synced, { name: 'B', kind: 'expense', color: '#123456', icon: 'hovercraft' }),
+    ).toEqual({ name: 'B', color: '#123456', icon: 'hovercraft' });
   });
 });

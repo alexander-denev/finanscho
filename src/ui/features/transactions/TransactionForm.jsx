@@ -10,8 +10,8 @@ import styles from './TransactionForm.module.css';
 /**
  * @typedef {object} TransactionFormProps
  * @property {TransactionDraft} initial
- * @property {readonly { id: string, name: string, currency: string }[]} accounts
- * @property {readonly { id: string, name: string, kind: string }[]} categories
+ * @property {readonly (import('../../components/itemOption.js').AccountChoice & { currency: string })[]} accounts
+ * @property {readonly import('../../components/itemOption.js').CategoryChoice[]} categories
  * @property {(draft: TransactionDraft) => Promise<void>} onSubmit throws ValidationError for inline errors
  * @property {() => void} onCancel
  * @property {() => void} [onDelete] shown when editing

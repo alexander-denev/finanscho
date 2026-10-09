@@ -114,6 +114,12 @@ UPPER_SNAKE_CASE only for true constants, `onX` for callback props.
   prefix). Results are built only from rule fields, the planned date, and the recorded
   transaction; automation-made transactions and balance adjustments never trigger anything. No
   balance checks (devices could disagree). Set budget steps store their currency.
+- **Icons and colors** (D56): account/category icon keys (`core/domain/itemIcons.js`) and swatch
+  names are stored in synced data, so they are only ever added, never renamed or removed. Add
+  icons in `scripts/importItemIcons.js` and rerun it (it regenerates the key list, paths, and
+  groups); every icon needs `icon.<key>` and `iconTags.<key>` strings. Account `icon: null` means
+  the type's icon (`accountIcon`). Colors are a swatch name or a custom `#rrggbb`; edits keep an
+  icon or color this version doesn't know.
 - Accounts and categories can be deleted only when no transaction or automation uses them; after
   a pull, deleted ones that are used again are restored (D42, D48, D53). Income and expenses may be
   uncategorized.

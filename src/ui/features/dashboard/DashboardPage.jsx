@@ -1,9 +1,11 @@
+import { accountIcon } from '../../../core/domain/account.js';
 import { useStores } from '../../context/StoresProvider.jsx';
 import { Amount } from '../../components/Amount.jsx';
 import { BalanceList } from '../../components/BalanceList.jsx';
 import { ButtonLink } from '../../components/ButtonLink.jsx';
 import { EmptyState } from '../../components/EmptyState.jsx';
 import { InlineMessage } from '../../components/InlineMessage.jsx';
+import { ItemIcon } from '../../components/ItemIcon.jsx';
 import { PageHeader } from '../../components/PageHeader.jsx';
 import { ProgressBar } from '../../components/ProgressBar.jsx';
 import { UpcomingList } from '../../components/UpcomingList.jsx';
@@ -109,6 +111,7 @@ export function DashboardPage() {
             id: account.id,
             name: account.name,
             color: account.color,
+            icon: accountIcon(account),
             minor: balanceMinor,
             currency: account.currency,
           }))}
@@ -173,7 +176,10 @@ export function DashboardPage() {
             <ul className={styles.budgetList}>
               {lines.map((line) => (
                 <li key={line.budget.id} className={styles.budgetItem}>
-                  <span>{line.category.name}</span>
+                  <span className={styles.budgetName}>
+                    <ItemIcon icon={line.category.icon} color={line.category.color} size="sm" />
+                    {line.category.name}
+                  </span>
                   <ProgressBar
                     ratio={line.progress.ratio}
                     tone={line.progress.status}

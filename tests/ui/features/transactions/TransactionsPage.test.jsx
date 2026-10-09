@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/preact';
 import { TransactionsPage } from '../../../../src/ui/features/transactions/TransactionsPage.jsx';
 import { createUiStores, renderWithStores } from '../../../helpers/renderWithStores.jsx';
+import { chooseOption } from '../../../helpers/chooseOption.js';
 
 /**
  * @param {(ui: Awaited<ReturnType<typeof createUiStores>>, accountId: string) => Promise<void>} [seed]
@@ -37,17 +38,16 @@ describe('TransactionsPage', () => {
     const amount = await within(dialog).findByLabelText('Amount');
     expect(amount.getAttribute('inputmode')).toBe('decimal');
     expect(document.activeElement).toBe(amount);
-    expect(/** @type {HTMLSelectElement} */ (within(dialog).getByLabelText('Account')).value).toBe(
-      ui.account.id,
-    );
+    expect(within(dialog).getByRole('combobox', { name: 'Account' }).textContent).toContain('Main');
     expect(/** @type {HTMLInputElement} */ (within(dialog).getByLabelText('Date')).value).toBe(
       '2024-05-15',
     );
 
     fireEvent.input(amount, { target: { value: '12,50' } });
-    fireEvent.change(within(dialog).getByLabelText('Category (optional)'), {
-      target: { value: 'seed:groceries' },
-    });
+    chooseOption(
+      within(dialog).getByRole('combobox', { name: 'Category (optional)' }),
+      'Groceries',
+    );
     fireEvent.input(within(dialog).getByLabelText('Payee (optional)'), {
       target: { value: 'Corner shop' },
     });
@@ -134,15 +134,15 @@ describe('TransactionsPage', () => {
       await within(dialog).findByLabelText('Payee (optional)')
     );
     // The payee comes before the category and account it can fill.
-    const category = within(dialog).getByLabelText('Category (optional)');
+    const category = within(dialog).getByRole('combobox', { name: 'Category (optional)' });
     expect(payee.compareDocumentPosition(category) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.input(payee, { target: { value: 'li' } });
     const option = await within(dialog).findByRole('option', { name: 'Lidl, Groceries' });
     fireEvent.mouseDown(option);
     expect(payee.value).toBe('Lidl');
-    expect(/** @type {HTMLSelectElement} */ (category).value).toBe('seed:groceries');
-    expect(/** @type {HTMLSelectElement} */ (within(dialog).getByLabelText('Account')).value).toBe(
-      card.id,
+    expect(category.textContent).toContain('Groceries');
+    expect(within(dialog).getByRole('combobox', { name: 'Account' }).textContent).toContain(
+      card.name,
     );
   });
 
@@ -167,7 +167,7 @@ describe('TransactionsPage', () => {
     const row = await screen.findByRole('button', { name: /Kiosk/ });
     expect(row.textContent).toContain('Uncategorized');
 
-    fireEvent.change(screen.getByLabelText('Category'), { target: { value: ':uncategorized' } });
+    chooseOption(screen.getByRole('combobox', { name: 'Category' }), 'Uncategorized');
     await waitFor(() => expect(screen.queryByRole('button', { name: /Market/ })).toBeNull());
     expect(screen.getByRole('button', { name: /Kiosk/ })).toBeTruthy();
   });
@@ -188,7 +188,7 @@ describe('TransactionsPage', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(50);
     fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
     await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(55));
-    fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'seed:travel' } });
+    chooseOption(screen.getByRole('combobox', { name: 'Category' }), 'Travel');
     await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(1));
     fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(50));

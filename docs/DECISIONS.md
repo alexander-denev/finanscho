@@ -745,3 +745,44 @@ chosen. It is now **its own page** (`/automations/new`, `/automations/:id`; user
   percentage needs a recorded transaction) show at Save, with "Needs attention" on the line.
 - Stop, Resume, and Delete change the stored automation, so the page returns to the list after
   them instead of keeping a draft that no longer matches; Run now and History stay on the page.
+
+### D56. Icons for accounts and categories, more colors, icon dropdowns
+
+User request: accounts get icons, a bigger icon pool, more colors with a color picker, and the
+icons visible wherever accounts and categories are shown or picked.
+
+- **Icon pool: 227 picked Lucide icons** (user decision over all ~1,600 Lucide or ~3,800 Material
+  icons, which would add roughly 150 KB–4 MB to the ~80 KB offline download). Lucide is drawn in
+  the same thin-line style as the app's own icons. `scripts/importItemIcons.js` holds the list
+  and groups and generates `core/domain/itemIcons.js` (allowed keys), `ui/icons/itemIconPaths.js`
+  (one path per icon) and `ui/icons/itemIconGroups.js`; `lucide` is a dev dependency only. Each
+  Lucide shape is folded into one path; a shape starting with a relative move gets `M0 0` first so
+  it stays in place once joined. The download grew by about 25 KB compressed.
+- **Keys are stored in data and only ever added.** The 16 original keys stay; they now draw
+  their Lucide equivalents, and so do the app's chrome icons that shared a key (`home`, `bolt`,
+  `wallet`, `tag`).
+- **License notice:** Lucide is ISC (some icons MIT, from Feather). The notice is kept in the
+  generated file as a legal comment, but the production minifier drops it, as it does for Preact
+  and idb. Shipping third-party notices (e.g. an about screen or a notices file) is a follow-up
+  for all dependencies.
+- **Account icons:** `icon: null` (and old records without the field) means "follow the type":
+  cash → wallet, checking → bank, savings → piggy bank, credit card → card, other → dots
+  (`ACCOUNT_TYPE_ICONS`, `accountIcon`). No migration; picking "Follows the account type" in the
+  chooser stores `null` again.
+- **Colors: 24 tuned swatches plus custom `#rrggbb`** (user decision). New names only were added;
+  the 8 old names keep their values. Each light/dark value reaches 3:1 against the page, raised
+  surfaces and its own tinted circle. Custom colors keep their hue with lightness clamped per
+  theme via CSS relative colors (`oklch(from …)`); browsers without them show the muted text color.
+- **Edits keep what this version doesn't know:** an icon or color that isn't in this version's
+  lists is still valid when it is what the record already has (`checkKeptOrValid`), so a device on
+  an older version can rename a category another device gave a newer icon. Unknown icons draw as
+  dots, unknown swatch names as muted.
+- **Pickers:** icon and color are each one button that opens a small window (user decision: a
+  24-color grid and a 227-icon grid inline made the editors long and distracting). Account and
+  category dropdowns became `IconSelect`, a select-only combobox (button + listbox) because native
+  `<select>` options can't show icons; other selects stay native. Its list opens upward when there
+  is no room below.
+- **Lists:** the colored dot (`Swatch`) is gone; `ItemIcon` (icon on a tinted circle) replaces it
+  in transaction rows (transfers, balance adjustments and uncategorized entries get gray arrows,
+  scales and a question mark), balances, budgets, the dashboard, categories, and payee
+  suggestions.

@@ -18,13 +18,48 @@ describe('AccountsPage', () => {
     fireEvent.input(within(dialog).getByLabelText('Opening balance'), {
       target: { value: '-250' },
     });
-    fireEvent.click(within(dialog).getByRole('radio', { name: 'Rose' }));
+    // The icon follows the type until one is chosen.
+    expect(
+      within(dialog).getByRole('button', { name: 'Icon Automatic (Credit card)' }),
+    ).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Color Teal' }));
+    const colors = await screen.findByRole('dialog', { name: 'Choose a color' });
+    fireEvent.click(within(colors).getByRole('button', { name: 'Rose' }));
+    expect(within(dialog).getByRole('button', { name: 'Color Rose' })).toBeTruthy();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save account' }));
 
     const list = await screen.findByRole('list', { name: 'Accounts' });
     const row = await within(list).findByRole('button', { name: /Visa/ });
     expect(row.textContent).toContain('Credit card');
     expect(row.textContent).toContain('Negative -€250.00');
+    const saved = ui.stores.accounts.items.value[0].account;
+    expect(saved.color).toBe('rose');
+    expect(saved.icon).toBeNull();
+  });
+
+  it('keeps a chosen icon and a custom color', async () => {
+    const ui = await createUiStores({ path: '/accounts' });
+    renderWithStores(<AccountsPage />, ui.stores);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Add account' })[0]);
+    const dialog = await screen.findByRole('dialog', { name: 'Add account' });
+    fireEvent.input(within(dialog).getByLabelText('Name'), { target: { value: 'Savings' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Icon Automatic (Checking)' }));
+    const icons = await screen.findByRole('dialog', { name: 'Choose an icon' });
+    fireEvent.input(within(icons).getByLabelText('Search icons'), { target: { value: 'piggy' } });
+    fireEvent.click(within(icons).getByRole('button', { name: 'Piggy bank' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Color Teal' }));
+    const colors = await screen.findByRole('dialog', { name: 'Choose a color' });
+    fireEvent.input(within(colors).getByLabelText('Custom color'), {
+      target: { value: '#AA3366' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save account' }));
+
+    await within(await screen.findByRole('list', { name: 'Accounts' })).findByRole('button', {
+      name: /Savings/,
+    });
+    const saved = ui.stores.accounts.items.value[0].account;
+    expect(saved.icon).toBe('piggyBank');
+    expect(saved.color).toBe('#aa3366');
   });
 
   it('opens the add dialog on /accounts/new and returns to /accounts when closed', async () => {

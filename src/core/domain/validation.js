@@ -57,6 +57,21 @@ export function isOneOf(value, allowed) {
 }
 
 /**
+ * Checks a value such as an icon or color: valid when `isValid` accepts it, or when it is what the record already
+ * has. A record synced from a newer app version may carry one this version doesn't know; keeping
+ * it must not block other edits.
+ * @param {unknown} value
+ * @param {(value: unknown) => boolean} isValid
+ * @param {unknown} current the existing record's value (undefined when creating)
+ * @returns {string | null} i18n error key
+ */
+export function checkKeptOrValid(value, isValid, current) {
+  return isValid(value) || (current !== undefined && value === current)
+    ? null
+    : 'validation.invalid';
+}
+
+/**
  * Collects non-null errors and throws a ValidationError when any exist.
  * @param {Record<string, string | null>} checks field → error key or null
  * @returns {void}

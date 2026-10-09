@@ -119,7 +119,11 @@ export function TransactionsPage() {
                     <li key={tx.id}>
                       <TransactionListItem
                         transaction={tx}
-                        category={category ? { name: category.name, color: category.color } : null}
+                        category={
+                          category
+                            ? { name: category.name, color: category.color, icon: category.icon }
+                            : null
+                        }
                         accountName={accountById.get(tx.accountId)?.name ?? ''}
                         toAccountName={
                           tx.toAccountId ? (accountById.get(tx.toAccountId)?.name ?? '') : ''

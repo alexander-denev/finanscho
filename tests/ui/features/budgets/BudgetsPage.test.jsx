@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/preact';
 import { BudgetsPage } from '../../../../src/ui/features/budgets/BudgetsPage.jsx';
 import { createUiStores, renderWithStores } from '../../../helpers/renderWithStores.jsx';
+import { chooseOption } from '../../../helpers/chooseOption.js';
 
 describe('BudgetsPage', () => {
   it('sets a budget and shows spent, remaining, and progress', async () => {
@@ -26,9 +27,7 @@ describe('BudgetsPage', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Set a budget' })[0]);
     const dialog = await screen.findByRole('dialog', { name: 'Set a budget' });
-    fireEvent.change(within(dialog).getByLabelText('Category'), {
-      target: { value: 'seed:groceries' },
-    });
+    chooseOption(within(dialog).getByRole('combobox', { name: 'Category' }), 'Groceries');
     fireEvent.input(within(dialog).getByLabelText('Monthly limit'), { target: { value: '50' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save budget' }));
 
@@ -44,9 +43,7 @@ describe('BudgetsPage', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Set a budget' })[0]);
     const dialog = await screen.findByRole('dialog', { name: 'Set a budget' });
     expect(within(dialog).queryByRole('button', { name: 'Repeat every month' })).toBeNull();
-    fireEvent.change(within(dialog).getByLabelText('Category'), {
-      target: { value: 'seed:dining' },
-    });
+    chooseOption(within(dialog).getByRole('combobox', { name: 'Category' }), 'Eating out');
     fireEvent.input(within(dialog).getByLabelText('Monthly limit'), { target: { value: '80' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Repeat every month' }));
     expect(ui.stores.router.currentPath.value).toBe('/automations/new/budget/seed%3Adining/80');

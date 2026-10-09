@@ -1,6 +1,6 @@
 import { Icon } from '../../components/Icon.jsx';
+import { ItemIcon } from '../../components/ItemIcon.jsx';
 import { ProgressBar } from '../../components/ProgressBar.jsx';
-import { Swatch } from '../../components/Swatch.jsx';
 import { formatMoney, formatPercent, t } from '../../i18n/i18n.js';
 import styles from './BudgetRow.module.css';
 
@@ -24,7 +24,7 @@ export function BudgetRow({ line, onSelect }) {
     <button type="button" className={styles.row} onClick={() => onSelect(budget.id)}>
       <span className={styles.top}>
         <span className={styles.name}>
-          <Swatch color={category.color} />
+          <ItemIcon icon={category.icon} color={category.color} size="sm" />
           {category.name}
           {budget.automationId && (
             <span className={styles.repeats}>

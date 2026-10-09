@@ -2,9 +2,10 @@ import { useSignal } from '@preact/signals';
 import { t } from '../i18n/i18n.js';
 import { ComboBox } from './ComboBox.jsx';
 import { DateInput } from './DateInput.jsx';
+import { IconSelect } from './IconSelect.jsx';
+import { itemOption } from './itemOption.js';
 import { MoneyInput } from './MoneyInput.jsx';
 import { SegmentedControl } from './SegmentedControl.jsx';
-import { Select } from './Select.jsx';
 import { TextField } from './TextField.jsx';
 import styles from './TransactionFields.module.css';
 
@@ -27,8 +28,8 @@ import styles from './TransactionFields.module.css';
  * @property {TransactionDraft} value
  * @property {(patch: Partial<TransactionDraft>) => void} onChange
  * @property {Record<string, string>} errors field → i18n key
- * @property {readonly { id: string, name: string, currency: string }[]} accounts
- * @property {readonly { id: string, name: string, kind: string }[]} categories
+ * @property {readonly (AccountChoice & { currency: string })[]} accounts
+ * @property {readonly CategoryChoice[]} categories
  * @property {boolean} [showDate]
  * @property {boolean} [showAmount] false when the amount is entered elsewhere (automation steps)
  * @property {{ payee?: import('preact').ComponentChildren, note?: import('preact').ComponentChildren }} [addons]
@@ -36,6 +37,9 @@ import styles from './TransactionFields.module.css';
  * @property {readonly PayeeSuggestion[]} [payeeSuggestions] most recent first
  * @property {boolean} [autofillAccount] whether a known payee may also set the account (new entries)
  */
+
+/** @typedef {import('./itemOption.js').AccountChoice} AccountChoice */
+/** @typedef {import('./itemOption.js').CategoryChoice} CategoryChoice */
 
 /**
  * A payee used before, with the kind, category, and account of its latest use.
@@ -85,7 +89,7 @@ export function TransactionFields({
    */
   const error = (field) => (errors[field] ? t(errors[field]) : null);
   const choose = { value: '', label: t('common.choose') };
-  const accountOptions = [choose, ...accounts.map((a) => ({ value: a.id, label: a.name }))];
+  const accountOptions = [choose, ...accounts.map((a) => itemOption(a))];
 
   /** @param {string} payee */
   const changePayee = (payee) => {
@@ -136,30 +140,33 @@ export function TransactionFields({
         label={t('common.optional', { label: t('transactions.payee') })}
         value={value.payee}
         error={error('payee')}
-        options={payeeSuggestions.map((s) => ({
-          value: s.payee,
+        options={payeeSuggestions.map((s) => {
           // Shows what choosing the payee fills in.
-          detail: categories.find((c) => c.id === s.categoryId)?.name,
-        }))}
+          const category = categories.find((c) => c.id === s.categoryId);
+          return {
+            value: s.payee,
+            detail: category?.name,
+            icon: category?.icon,
+            color: category?.color,
+          };
+        })}
         onInput={changePayee}
       />
       {addons.payee}
       {!isTransfer && (
-        <Select
+        <IconSelect
           label={t('common.optional', { label: t('transactions.category') })}
           value={value.categoryId}
           options={[
-            { value: '', label: t('transactions.uncategorized') },
-            ...categories
-              .filter((c) => c.kind === value.kind)
-              .map((c) => ({ value: c.id, label: c.name })),
+            { value: '', label: t('transactions.uncategorized'), icon: 'help' },
+            ...categories.filter((c) => c.kind === value.kind).map((c) => itemOption(c)),
           ]}
           error={error('categoryId')}
           onChange={(categoryId) => onChange({ categoryId })}
         />
       )}
       <div className={styles.pair}>
-        <Select
+        <IconSelect
           label={isTransfer ? t('transactions.fromAccount') : t('transactions.account')}
           value={value.accountId}
           options={accountOptions}
@@ -170,7 +177,7 @@ export function TransactionFields({
           }}
         />
         {isTransfer && (
-          <Select
+          <IconSelect
             label={t('transactions.toAccount')}
             value={value.toAccountId}
             options={accountOptions}

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/preact';
 import { App } from '../../../src/app/App.jsx';
 import { createUiStores } from '../../helpers/renderWithStores.jsx';
+import { chooseOption } from '../../helpers/chooseOption.js';
 
 describe('App', () => {
   it('routes by hash and adds a transaction from anywhere, updating the dashboard', async () => {
@@ -19,9 +20,10 @@ describe('App', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Add transaction' })[0]);
     const dialog = await screen.findByRole('dialog', { name: 'Add transaction' });
     fireEvent.input(await within(dialog).findByLabelText('Amount'), { target: { value: '30' } });
-    fireEvent.change(within(dialog).getByLabelText('Category (optional)'), {
-      target: { value: 'seed:transport' },
-    });
+    chooseOption(
+      within(dialog).getByRole('combobox', { name: 'Category (optional)' }),
+      'Transport',
+    );
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save transaction' }));
 
     const total = await screen.findByRole('heading', { name: 'Total balance' });

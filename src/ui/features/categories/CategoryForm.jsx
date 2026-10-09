@@ -1,13 +1,12 @@
 import { SWATCHES } from '../../../core/domain/account.js';
-import { CATEGORY_ICONS } from '../../../core/domain/category.js';
 import { Button } from '../../components/Button.jsx';
+import { ColorPicker } from '../../components/ColorPicker.jsx';
+import { IconPicker } from '../../components/IconPicker.jsx';
 import { InlineMessage } from '../../components/InlineMessage.jsx';
 import { SegmentedControl } from '../../components/SegmentedControl.jsx';
-import { SwatchPicker } from '../../components/SwatchPicker.jsx';
 import { TextField } from '../../components/TextField.jsx';
 import { useFormState } from '../../hooks/useFormState.js';
 import { t } from '../../i18n/i18n.js';
-import { IconPicker } from './IconPicker.jsx';
 import styles from './CategoryForm.module.css';
 
 /** @typedef {{ name: string, kind: string, color: string, icon: string }} CategoryDraft */
@@ -60,17 +59,18 @@ export function CategoryForm({ initial, isNew, onSubmit, onCancel, extraActions 
           {t(`kind.${draft.kind}`)} — {t('categories.kindFixed')}
         </p>
       )}
-      <SwatchPicker
-        legend={t('categories.color')}
+      <ColorPicker
+        label={t('categories.color')}
         value={draft.color}
         options={SWATCHES.map((swatch) => ({ value: swatch, label: t(`swatch.${swatch}`) }))}
+        customLabel={t('swatch.custom')}
         onChange={(color) => form.update({ color })}
       />
       <IconPicker
-        legend={t('categories.icon')}
+        label={t('categories.icon')}
         value={draft.icon}
-        options={CATEGORY_ICONS.map((icon) => ({ value: icon, label: t(`icon.${icon}`) }))}
-        onChange={(icon) => form.update({ icon })}
+        color={draft.color}
+        onChange={(icon) => form.update({ icon: icon ?? 'dots' })}
       />
       {form.formError.value && <InlineMessage tone="error">{form.formError.value}</InlineMessage>}
       <div className={styles.actions}>

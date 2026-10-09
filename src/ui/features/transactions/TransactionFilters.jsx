@@ -4,7 +4,8 @@ import { yearMonthOf } from '../../../core/domain/localDate.js';
 import { debounce } from '../../../shared/debounce.js';
 import { Button } from '../../components/Button.jsx';
 import { MonthPicker } from '../../components/MonthPicker.jsx';
-import { Select } from '../../components/Select.jsx';
+import { IconSelect } from '../../components/IconSelect.jsx';
+import { itemOption } from '../../components/itemOption.js';
 import { TextField } from '../../components/TextField.jsx';
 import { t } from '../../i18n/i18n.js';
 import styles from './TransactionFilters.module.css';
@@ -16,12 +17,14 @@ import styles from './TransactionFilters.module.css';
  * @property {TransactionFilter} filter
  * @property {(changes: Partial<TransactionFilter>) => void} onChange
  * @property {() => void} onClear
- * @property {readonly { id: string, name: string }[]} accounts
- * @property {readonly { id: string, name: string }[]} categories
+ * @property {readonly import('../../components/itemOption.js').AccountChoice[]} accounts
+ * @property {readonly import('../../components/itemOption.js').CategoryChoice[]} categories
  * @property {string} today
  */
 
 const SEARCH_DELAY_MS = 250;
+/** Category kinds in the order the category filter lists them. */
+const KIND_ORDER = ['expense', 'income'];
 /** Category select value for "Uncategorized"; real category IDs never start with a colon. */
 const UNCATEGORIZED = ':uncategorized';
 
@@ -50,22 +53,26 @@ export function TransactionFilters({ filter, onChange, onClear, accounts, catego
   return (
     <section className={styles.root} aria-label={t('transactions.filters')}>
       <div className={styles.grid}>
-        <Select
+        <IconSelect
           label={t('transactions.filterAccount')}
           value={filter.accountId ?? ''}
           options={[
-            { value: '', label: t('transactions.allAccounts') },
-            ...accounts.map((a) => ({ value: a.id, label: a.name })),
+            { value: '', label: t('transactions.allAccounts'), icon: 'list' },
+            ...accounts.map((a) => itemOption(a)),
           ]}
           onChange={(value) => onChange({ accountId: value || null })}
         />
-        <Select
+        <IconSelect
           label={t('transactions.filterCategory')}
           value={filter.uncategorized ? UNCATEGORIZED : (filter.categoryId ?? '')}
           options={[
-            { value: '', label: t('transactions.allCategories') },
-            { value: UNCATEGORIZED, label: t('transactions.uncategorized') },
-            ...categories.map((c) => ({ value: c.id, label: c.name })),
+            { value: '', label: t('transactions.allCategories'), icon: 'list' },
+            { value: UNCATEGORIZED, label: t('transactions.uncategorized'), icon: 'help' },
+            ...KIND_ORDER.flatMap((kind) =>
+              categories
+                .filter((c) => c.kind === kind)
+                .map((c) => itemOption(c, t(`kind.${kind}`))),
+            ),
           ]}
           onChange={(value) =>
             onChange({

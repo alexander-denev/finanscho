@@ -1,0 +1,117 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.label {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+  color: var(--c-ink);
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: var(--tap);
+  padding: var(--sp-1) var(--sp-3) var(--sp-1) var(--sp-2);
+  border: var(--hairline) solid var(--c-rule);
+  border-radius: var(--r-sm);
+  background: var(--c-raised);
+  color: var(--c-ink);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.trigger:focus-visible {
+  border-color: var(--c-pine);
+  outline: var(--focus-ring) solid var(--c-brass);
+  outline-offset: var(--hairline);
+}
+
+.trigger .swatch {
+  width: var(--item-icon);
+  height: var(--item-icon);
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.change {
+  flex: none;
+  color: var(--c-pine);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+}
+
+.tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap);
+  height: var(--tap);
+  padding: 0;
+  border: var(--focus-ring) solid transparent;
+  border-radius: var(--r-pill);
+  background: none;
+  cursor: pointer;
+}
+
+.tile[aria-current='true'] {
+  border-color: var(--c-ink);
+}
+
+.tile:focus-visible,
+.customTile:focus-within {
+  outline: var(--focus-ring) solid var(--c-brass);
+  outline-offset: var(--hairline);
+}
+
+.swatch {
+  display: block;
+  flex: none;
+  width: var(--sp-6);
+  height: var(--sp-6);
+  border-radius: var(--r-pill);
+  background: var(--swatch);
+}
+
+.wheel {
+  background: conic-gradient(
+    var(--sw-red),
+    var(--sw-gold),
+    var(--sw-green),
+    var(--sw-cyan),
+    var(--sw-indigo),
+    var(--sw-pink),
+    var(--sw-red)
+  );
+}
+
+.colorInput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}

@@ -44,9 +44,18 @@ Supporting neutrals derived from Paper and Ink:
 | `--c-on-pine` | `#FFFFFF` | `#0D1A17` | text on Pine buttons                |
 | `--c-near`    | `#8A5E12` | `#E2B45C` | budget "near limit" (Brass)         |
 
-Swatches (account and category colors, chosen by the user) have their own light/dark pairs:
-teal, blue, plum, amber, rust, olive, rose, slate. They are used only as small dots/bars, never as
-text color, so they need 3:1 against the background, not 4.5:1.
+Swatches (account and category colors, chosen by the user) have their own light/dark pairs, 24 of
+them in rainbow order (red … gray, `--sw-*`). They color icons and the soft circle behind them,
+never text, so they need 3:1 against the background and against their own tinted circle
+(`--item-tint`), not 4.5:1. A user may also pick any custom `#rrggbb`: it keeps its hue, but its
+OKLCH lightness is clamped into a readable range per theme (`--custom-l-min`/`--custom-l-max`,
+`ui/styles/itemColor.js`).
+
+Accounts and categories show their **icon on a circle tinted with their color** (`ItemIcon`)
+wherever they are listed or picked. The icons are a curated Lucide set in the same thin-line style
+as the app's own icons (`scripts/importItemIcons.js`, D56). Icon and color are chosen in small
+windows opened from one button each (`IconPicker`, `ColorPicker`), so editors stay short; account
+and category dropdowns are `IconSelect`, which shows the icon in the field and in every row.
 
 ## Typography
 

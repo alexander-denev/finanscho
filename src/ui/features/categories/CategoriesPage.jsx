@@ -3,10 +3,9 @@ import { useStores } from '../../context/StoresProvider.jsx';
 import { Button } from '../../components/Button.jsx';
 import { ConfirmDialog } from '../../components/ConfirmDialog.jsx';
 import { Dialog } from '../../components/Dialog.jsx';
-import { Icon } from '../../components/Icon.jsx';
+import { ItemIcon } from '../../components/ItemIcon.jsx';
 import { InlineMessage } from '../../components/InlineMessage.jsx';
 import { PageHeader } from '../../components/PageHeader.jsx';
-import { Swatch } from '../../components/Swatch.jsx';
 import { errorMessage, t } from '../../i18n/i18n.js';
 import { CategoryForm } from './CategoryForm.jsx';
 import styles from './CategoriesPage.module.css';
@@ -34,8 +33,7 @@ function CategoryList({ title, items, onSelect }) {
         {items.map((category) => (
           <li key={category.id}>
             <button type="button" className={styles.row} onClick={() => onSelect(category.id)}>
-              <Swatch color={category.color} />
-              <Icon name={category.icon} />
+              <ItemIcon icon={category.icon} color={category.color} />
               <span className={styles.name}>{category.name}</span>
             </button>
           </li>

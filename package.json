@@ -5,7 +5,7 @@
   "description": "Local-first personal finance manager with optional WebDAV sync.",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
@@ -41,6 +41,7 @@
     "fake-indexeddb": "^6.2.5",
     "globals": "^17.12.0",
     "happy-dom": "^20.14.5",
+    "lucide": "^1.54.0",
     "prettier": "^3.9.9",
     "typescript": "^6.0.3",
     "vite": "^8.3.1",

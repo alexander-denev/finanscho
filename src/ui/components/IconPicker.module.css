@@ -1,0 +1,111 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.label {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+  color: var(--c-ink);
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: var(--tap);
+  padding: var(--sp-1) var(--sp-3) var(--sp-1) var(--sp-2);
+  border: var(--hairline) solid var(--c-rule);
+  border-radius: var(--r-sm);
+  background: var(--c-raised);
+  color: var(--c-ink);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.trigger:focus-visible {
+  border-color: var(--c-pine);
+  outline: var(--focus-ring) solid var(--c-brass);
+  outline-offset: var(--hairline);
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.change {
+  flex: none;
+  color: var(--c-pine);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  /* Keeps the window from jumping in size while a search narrows the icons. */
+  min-height: var(--chooser-min-h);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.groupName {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-strong);
+  color: var(--c-muted);
+}
+
+.tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap);
+  height: var(--tap);
+  padding: 0;
+  border: var(--hairline) solid var(--c-rule);
+  border-radius: var(--r-sm);
+  background: var(--c-raised);
+  color: var(--c-muted);
+  cursor: pointer;
+}
+
+.tile:hover {
+  border-color: var(--c-pine);
+  color: var(--c-ink);
+}
+
+.tile[aria-current='true'] {
+  border-color: var(--c-pine);
+  background: var(--c-pine);
+  color: var(--c-on-pine);
+}
+
+.tile:focus-visible {
+  outline: var(--focus-ring) solid var(--c-brass);
+  outline-offset: var(--focus-ring);
+}
+
+.empty {
+  color: var(--c-muted);
+}

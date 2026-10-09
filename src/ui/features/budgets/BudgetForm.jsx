@@ -1,7 +1,8 @@
 import { Button } from '../../components/Button.jsx';
+import { IconSelect } from '../../components/IconSelect.jsx';
 import { InlineMessage } from '../../components/InlineMessage.jsx';
+import { itemOption } from '../../components/itemOption.js';
 import { MoneyInput } from '../../components/MoneyInput.jsx';
-import { Select } from '../../components/Select.jsx';
 import { useFormState } from '../../hooks/useFormState.js';
 import { t } from '../../i18n/i18n.js';
 import styles from './BudgetForm.module.css';
@@ -11,7 +12,7 @@ import styles from './BudgetForm.module.css';
 /**
  * @typedef {object} BudgetFormProps
  * @property {BudgetDraft} initial
- * @property {readonly { id: string, name: string }[]} categories choosable categories (a fixed one when editing)
+ * @property {readonly import('../../components/itemOption.js').CategoryChoice[]} categories choosable categories (a fixed one when editing)
  * @property {string} currency
  * @property {(draft: BudgetDraft) => Promise<void>} onSubmit
  * @property {() => void} onCancel
@@ -49,12 +50,12 @@ export function BudgetForm({
 
   return (
     <form className={styles.form} onSubmit={handleSubmit} noValidate>
-      <Select
+      <IconSelect
         label={t('budgets.category')}
         value={draft.categoryId}
         options={[
           ...(onRemove ? [] : [{ value: '', label: t('common.choose') }]),
-          ...categories.map((c) => ({ value: c.id, label: c.name })),
+          ...categories.map((c) => itemOption(c)),
         ]}
         disabled={Boolean(onRemove)}
         error={error('categoryId')}

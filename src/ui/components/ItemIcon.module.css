@@ -1,0 +1,20 @@
+.root {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--item-color) var(--item-tint), transparent);
+  color: var(--item-color);
+}
+
+.md {
+  width: var(--item-icon);
+  height: var(--item-icon);
+}
+
+.sm {
+  width: var(--item-icon-sm);
+  height: var(--item-icon-sm);
+  --icon: var(--icon-sm);
+}

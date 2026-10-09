@@ -14,7 +14,10 @@ describe('CategoriesPage', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Add category' });
     fireEvent.input(within(dialog).getByLabelText('Name'), { target: { value: 'Side gigs' } });
     fireEvent.click(within(dialog).getByRole('radio', { name: 'Income' }));
-    fireEvent.click(within(dialog).getByRole('radio', { name: 'Work' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Icon Other' }));
+    const icons = await screen.findByRole('dialog', { name: 'Choose an icon' });
+    fireEvent.click(within(icons).getByRole('button', { name: 'Work' }));
+    expect(within(dialog).getByRole('button', { name: 'Icon Work' })).toBeTruthy();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save category' }));
 
     const income = await screen.findByRole('heading', { name: 'Income categories' });

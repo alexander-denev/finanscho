@@ -1,12 +1,15 @@
 import { useId } from 'preact/hooks';
 import { useSignal } from '@preact/signals';
 import { controlClassName, Field } from './Field.jsx';
+import { ItemIcon } from './ItemIcon.jsx';
 import styles from './ComboBox.module.css';
 
 /**
  * @typedef {object} ComboBoxOption
  * @property {string} value inserted into the field when chosen
  * @property {string} [detail] secondary text shown at the end of the row
+ * @property {import('./Icon.jsx').IconName} [icon] shown before the detail, tinted with `color`
+ * @property {string | null} [color]
  */
 
 /**
@@ -175,6 +178,7 @@ export function ComboBox({ label, value, onInput, options, hint, error, maxOptio
                   }}
                 >
                   <span className={styles.text}>{highlight(option.value, value)}</span>
+                  {option.icon && <ItemIcon icon={option.icon} color={option.color} size="sm" />}
                   {option.detail && <span className={styles.detail}>{option.detail}</span>}
                 </li>
               ))}

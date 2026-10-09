@@ -1,6 +1,8 @@
 import { CONDITION_OPS } from '../../../core/domain/automation.js';
 import { TRANSACTION_KINDS } from '../../../core/domain/transaction.js';
 import { Button } from '../../components/Button.jsx';
+import { IconSelect } from '../../components/IconSelect.jsx';
+import { itemOption } from '../../components/itemOption.js';
 import { MoneyInput } from '../../components/MoneyInput.jsx';
 import { Select } from '../../components/Select.jsx';
 import { TextField } from '../../components/TextField.jsx';
@@ -9,10 +11,13 @@ import styles from './ConditionFields.module.css';
 
 /** @typedef {import('./automationDraft.js').ConditionDraft} ConditionDraft */
 
+/** Category kinds in the order the category value lists them. */
+const KIND_ORDER = ['expense', 'income'];
+
 /**
  * @typedef {object} ConditionPickers
- * @property {readonly { id: string, name: string, currency: string }[]} accounts
- * @property {readonly { id: string, name: string, kind: string }[]} categories
+ * @property {readonly (import('../../components/itemOption.js').AccountChoice & { currency: string })[]} accounts
+ * @property {readonly import('../../components/itemOption.js').CategoryChoice[]} categories
  * @property {readonly string[]} currencies currencies of the user's accounts
  */
 
@@ -47,10 +52,10 @@ export function ConditionFields({ value, errors, onChange, onRemove, pickers }) 
       case 'account':
       case 'toAccount':
         return (
-          <Select
+          <IconSelect
             label={t('automations.value')}
             value={value.accountId}
-            options={[choose, ...pickers.accounts.map((a) => ({ value: a.id, label: a.name }))]}
+            options={[choose, ...pickers.accounts.map((a) => itemOption(a))]}
             error={error('accountId')}
             onChange={(accountId) => onChange({ accountId })}
           />
@@ -67,15 +72,16 @@ export function ConditionFields({ value, errors, onChange, onRemove, pickers }) 
         );
       case 'category':
         return value.op === 'isEmpty' ? null : (
-          <Select
+          <IconSelect
             label={t('automations.value')}
             value={value.categoryId}
             options={[
               choose,
-              ...pickers.categories.map((c) => ({
-                value: c.id,
-                label: `${c.name} (${t(`kind.${c.kind}`)})`,
-              })),
+              ...KIND_ORDER.flatMap((kind) =>
+                pickers.categories
+                  .filter((c) => c.kind === kind)
+                  .map((c) => itemOption(c, t(`kind.${kind}`))),
+              ),
             ]}
             error={error('categoryId')}
             onChange={(categoryId) => onChange({ categoryId })}

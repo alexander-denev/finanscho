@@ -1,9 +1,10 @@
-import { ACCOUNT_TYPES, SWATCHES } from '../../../core/domain/account.js';
+import { ACCOUNT_TYPE_ICONS, ACCOUNT_TYPES, SWATCHES } from '../../../core/domain/account.js';
 import { Button } from '../../components/Button.jsx';
+import { ColorPicker } from '../../components/ColorPicker.jsx';
+import { IconPicker } from '../../components/IconPicker.jsx';
 import { InlineMessage } from '../../components/InlineMessage.jsx';
 import { MoneyInput } from '../../components/MoneyInput.jsx';
 import { Select } from '../../components/Select.jsx';
-import { SwatchPicker } from '../../components/SwatchPicker.jsx';
 import { TextField } from '../../components/TextField.jsx';
 import { useFormState } from '../../hooks/useFormState.js';
 import { t } from '../../i18n/i18n.js';
@@ -16,6 +17,7 @@ import styles from './AccountForm.module.css';
  * @property {string} currency
  * @property {string} openingBalance
  * @property {string | null} color
+ * @property {string | null} icon null shows the type's icon
  */
 
 /**
@@ -83,11 +85,22 @@ export function AccountForm({ initial, isNew, onSubmit, onCancel, extraActions }
         allowNegative
         onInput={(openingBalance) => form.update({ openingBalance })}
       />
-      <SwatchPicker
-        legend={t('accounts.color')}
+      <ColorPicker
+        label={t('accounts.color')}
         value={draft.color}
         options={SWATCHES.map((swatch) => ({ value: swatch, label: t(`swatch.${swatch}`) }))}
+        customLabel={t('swatch.custom')}
         onChange={(color) => form.update({ color })}
+      />
+      <IconPicker
+        label={t('accounts.icon')}
+        value={draft.icon}
+        color={draft.color}
+        automatic={{
+          icon: ACCOUNT_TYPE_ICONS[/** @type {keyof typeof ACCOUNT_TYPE_ICONS} */ (draft.type)],
+          label: t('accounts.iconAutomatic', { type: t(`accountType.${draft.type}`) }),
+        }}
+        onChange={(icon) => form.update({ icon })}
       />
       {form.formError.value && <InlineMessage tone="error">{form.formError.value}</InlineMessage>}
       <div className={styles.actions}>

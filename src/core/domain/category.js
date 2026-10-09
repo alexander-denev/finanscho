@@ -1,41 +1,29 @@
-import { SWATCHES } from './account.js';
-import { checkRequiredText, cleanText, isOneOf, throwIfInvalid } from './validation.js';
+import { isItemColor } from './account.js';
+import { ITEM_ICONS } from './itemIcons.js';
+import {
+  checkKeptOrValid,
+  checkRequiredText,
+  cleanText,
+  isOneOf,
+  throwIfInvalid,
+} from './validation.js';
 
 /** @typedef {import('./validation.js').BaseEntity} BaseEntity */
 /** @typedef {import('./validation.js').EntityContext} EntityContext */
 /** @typedef {import('./account.js').Swatch} Swatch */
+/** @typedef {import('./account.js').ItemColor} ItemColor */
+/** @typedef {import('./itemIcons.js').ItemIcon} ItemIcon */
 
 export const CATEGORY_KINDS = /** @type {const} */ (['income', 'expense']);
 
-/** Icon keys; the UI maps each to an inline SVG. */
-export const CATEGORY_ICONS = /** @type {const} */ ([
-  'cart',
-  'home',
-  'bolt',
-  'car',
-  'utensils',
-  'heart',
-  'film',
-  'shirt',
-  'plane',
-  'book',
-  'gift',
-  'phone',
-  'briefcase',
-  'coins',
-  'arrowIn',
-  'dots',
-]);
-
 /** @typedef {(typeof CATEGORY_KINDS)[number]} CategoryKind */
-/** @typedef {(typeof CATEGORY_ICONS)[number]} CategoryIcon */
 
 /**
  * @typedef {BaseEntity & {
  *   name: string,
  *   kind: CategoryKind,
- *   color: Swatch,
- *   icon: CategoryIcon,
+ *   color: ItemColor,
+ *   icon: ItemIcon,
  *   archived: boolean,
  * }} Category
  */
@@ -55,7 +43,7 @@ export const SEED_ID_PREFIX = 'seed:';
  * Default categories seeded on first run. IDs are deterministic (`seed:<slug>`) so two devices
  * seeding independently produce the same records. Names are stored in English, the only v1
  * locale, so seeded records are identical on every device.
- * @type {ReadonlyArray<{ slug: string, name: string, kind: CategoryKind, color: Swatch, icon: CategoryIcon }>}
+ * @type {ReadonlyArray<{ slug: string, name: string, kind: CategoryKind, color: Swatch, icon: ItemIcon }>}
  */
 export const DEFAULT_CATEGORIES = [
   { slug: 'groceries', name: 'Groceries', kind: 'expense', color: 'olive', icon: 'cart' },
@@ -78,20 +66,25 @@ export const DEFAULT_CATEGORIES = [
 
 /**
  * @param {CategoryInput} input
- * @returns {{ name: string, kind: CategoryKind, color: Swatch, icon: CategoryIcon }}
+ * @param {Category} [existing] the category being edited
+ * @returns {{ name: string, kind: CategoryKind, color: ItemColor, icon: ItemIcon }}
  */
-function normalize(input) {
+function normalize(input, existing) {
   throwIfInvalid({
     name: checkRequiredText(input.name),
     kind: isOneOf(input.kind, CATEGORY_KINDS) ? null : 'validation.required',
-    color: isOneOf(input.color, SWATCHES) ? null : 'validation.required',
-    icon: isOneOf(input.icon, CATEGORY_ICONS) ? null : 'validation.required',
+    color: input.color
+      ? checkKeptOrValid(input.color, isItemColor, existing?.color)
+      : 'validation.required',
+    icon: input.icon
+      ? checkKeptOrValid(input.icon, (value) => isOneOf(value, ITEM_ICONS), existing?.icon)
+      : 'validation.required',
   });
   return {
     name: cleanText(input.name),
     kind: /** @type {CategoryKind} */ (input.kind),
-    color: /** @type {Swatch} */ (input.color),
-    icon: /** @type {CategoryIcon} */ (input.icon),
+    color: input.color,
+    icon: /** @type {ItemIcon} */ (input.icon),
   };
 }
 
@@ -117,11 +110,11 @@ export function createCategory(input, ctx) {
  * edits keep the existing kind.
  * @param {Category} existing
  * @param {CategoryInput} input
- * @returns {{ name: string, color: Swatch, icon: CategoryIcon }}
+ * @returns {{ name: string, color: ItemColor, icon: ItemIcon }}
  * @throws {import('../errors.js').ValidationError}
  */
 export function categoryEdits(existing, input) {
-  const { name, color, icon } = normalize({ ...input, kind: existing.kind });
+  const { name, color, icon } = normalize({ ...input, kind: existing.kind }, existing);
   return { name, color, icon };
 }
 

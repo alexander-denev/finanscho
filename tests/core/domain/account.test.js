@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { accountEdits, createAccount } from '../../../src/core/domain/account.js';
+import {
+  accountEdits,
+  accountIcon,
+  createAccount,
+  isItemColor,
+} from '../../../src/core/domain/account.js';
 import { fieldErrors } from '../../helpers/fieldErrors.js';
 
 const ctx = { id: 'id-1', now: '2024-05-01T10:00:00.000Z' };
@@ -56,5 +61,58 @@ describe('account', () => {
         accountEdits(account, { name: 'Y', type: 'cash', currency: 'EUR', openingBalance: '1.5' }),
       ),
     ).toEqual({ openingBalance: 'validation.money.tooManyDecimals' });
+  });
+
+  it('stores no icon until one is chosen, and shows the type icon meanwhile', () => {
+    const account = createAccount(
+      { name: 'Jar', type: 'savings', currency: 'EUR', openingBalance: '0' },
+      ctx,
+    );
+    expect(account.icon).toBeNull();
+    expect(accountIcon(account)).toBe('piggyBank');
+    expect(accountIcon({ ...account, type: 'creditCard' })).toBe('card');
+    expect(accountIcon({ ...account, icon: 'gem' })).toBe('gem');
+  });
+
+  it('accepts icons from the pool and rejects others', () => {
+    const input = { name: 'A', type: 'cash', currency: 'EUR', openingBalance: '0' };
+    expect(createAccount({ ...input, icon: 'bitcoin' }, ctx).icon).toBe('bitcoin');
+    expect(fieldErrors(() => createAccount({ ...input, icon: 'unicorn' }, ctx))).toEqual({
+      icon: 'validation.invalid',
+    });
+  });
+
+  it('accepts swatch names and lowercase #rrggbb colors', () => {
+    expect(isItemColor('teal')).toBe(true);
+    expect(isItemColor('navy')).toBe(true);
+    expect(isItemColor('#aa3366')).toBe(true);
+    expect(isItemColor('#AA3366')).toBe(false);
+    expect(isItemColor('#abc')).toBe(false);
+    expect(isItemColor('neon')).toBe(false);
+    expect(isItemColor(null)).toBe(false);
+  });
+
+  it('keeps an icon or color this version does not know when editing other fields', () => {
+    const synced = {
+      ...createAccount({ name: 'A', type: 'cash', currency: 'EUR', openingBalance: '0' }, ctx),
+      icon: /** @type {any} */ ('hovercraft'),
+      color: 'ultraviolet',
+    };
+    const input = {
+      name: 'Renamed',
+      type: 'cash',
+      currency: 'EUR',
+      openingBalance: '0',
+      icon: 'hovercraft',
+      color: 'ultraviolet',
+    };
+    expect(accountEdits(synced, input)).toMatchObject({
+      name: 'Renamed',
+      icon: 'hovercraft',
+      color: 'ultraviolet',
+    });
+    expect(fieldErrors(() => accountEdits(synced, { ...input, icon: 'jetpack' }))).toEqual({
+      icon: 'validation.invalid',
+    });
   });
 });

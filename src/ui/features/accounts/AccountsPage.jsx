@@ -1,4 +1,5 @@
 import { useSignal } from '@preact/signals';
+import { accountIcon } from '../../../core/domain/account.js';
 import { toDecimalString } from '../../../core/domain/money.js';
 import { useStores } from '../../context/StoresProvider.jsx';
 import { Amount } from '../../components/Amount.jsx';
@@ -49,6 +50,7 @@ export function AccountsPage() {
         currency: account.currency,
         openingBalance: toDecimalString(account.openingBalanceMinor, account.currency),
         color: account.color,
+        icon: account.icon ?? null,
       }
     : {
         name: '',
@@ -56,6 +58,7 @@ export function AccountsPage() {
         currency: settings.values.value.defaultCurrency,
         openingBalance: '',
         color: 'teal',
+        icon: null,
       };
 
   const close = () => {
@@ -160,6 +163,7 @@ export function AccountsPage() {
       name: a.name,
       subtitle: `${t(`accountType.${a.type}`)} · ${a.currency}`,
       color: a.color,
+      icon: accountIcon(a),
       minor: balanceMinor,
       currency: a.currency,
     }));

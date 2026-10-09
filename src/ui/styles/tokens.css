@@ -27,14 +27,35 @@
   --c-scrim: rgb(17 22 20 / 45%);
 
   /* Swatches */
-  --sw-teal: #2a7f76;
-  --sw-blue: #3566a8;
-  --sw-plum: #7a4b8c;
-  --sw-amber: #b7791f;
+  --sw-red: #b8322f;
   --sw-rust: #b4532a;
+  --sw-orange: #b85a10;
+  --sw-amber: #b7791f;
+  --sw-gold: #8a7012;
+  --sw-sand: #87704c;
+  --sw-brown: #7a5236;
   --sw-olive: #6b7a2a;
+  --sw-lime: #4d7a1d;
+  --sw-green: #2f7a3c;
+  --sw-forest: #2d5e3f;
+  --sw-mint: #23805a;
+  --sw-teal: #2a7f76;
+  --sw-cyan: #1f7891;
+  --sw-sky: #1d76a8;
+  --sw-blue: #3566a8;
+  --sw-navy: #2b4372;
+  --sw-indigo: #4a4fb0;
+  --sw-violet: #6d45b8;
+  --sw-plum: #7a4b8c;
+  --sw-pink: #a8388a;
   --sw-rose: #b34a6a;
   --sw-slate: #56657a;
+  --sw-gray: #5f5f5f;
+  /* Custom colors keep their hue; lightness (OKLCH) is clamped into this readable range. */
+  --custom-l-min: 0.38;
+  --custom-l-max: 0.56;
+  /* How strongly an item color tints the circle behind its icon. */
+  --item-tint: 14%;
 
   /* Typography */
   --font-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
@@ -73,13 +94,17 @@
   --hairline: 1px;
   --focus-ring: 2px;
   --progress-h: 6px;
-  --dot: 10px;
   --icon: 20px;
+  --icon-sm: 16px;
+  --item-icon: 32px;
+  --item-icon-sm: 24px;
   --content-max: 44rem;
   --sidebar-w: 15rem;
   --tabbar-h: 60px;
   --fab: 56px;
   --dialog-max: 32rem;
+  --popup-max-h: 18rem;
+  --chooser-min-h: 60dvh;
   --measure: 34em;
   --field-min: 12rem;
   --month-label: 9em;
@@ -115,14 +140,33 @@
     --c-pine-soft: #1c2d29;
     --c-brick-soft: #33201c;
     --c-scrim: rgb(0 0 0 / 60%);
-    --sw-teal: #5fc0b3;
-    --sw-blue: #7ea8e6;
-    --sw-plum: #c198d6;
-    --sw-amber: #e6b35a;
+    --sw-red: #f08080;
     --sw-rust: #e98d63;
+    --sw-orange: #f0a35e;
+    --sw-amber: #e6b35a;
+    --sw-gold: #ddc35a;
+    --sw-sand: #d2bb92;
+    --sw-brown: #c9a080;
     --sw-olive: #b4c46a;
+    --sw-lime: #a6d16a;
+    --sw-green: #7fcf8a;
+    --sw-forest: #8dbf9c;
+    --sw-mint: #74d6a6;
+    --sw-teal: #5fc0b3;
+    --sw-cyan: #6cc9e0;
+    --sw-sky: #79c3ef;
+    --sw-blue: #7ea8e6;
+    --sw-navy: #9db3e3;
+    --sw-indigo: #a3a8f0;
+    --sw-violet: #b59af0;
+    --sw-plum: #c198d6;
+    --sw-pink: #ec93d2;
     --sw-rose: #e68aa6;
     --sw-slate: #9aaabf;
+    --sw-gray: #ababab;
+    --custom-l-min: 0.72;
+    --custom-l-max: 0.86;
+    --item-tint: 20%;
     --shadow-float: 0 10px 30px rgb(0 0 0 / 50%), 0 2px 6px rgb(0 0 0 / 40%);
   }
 }
@@ -144,14 +188,33 @@
   --c-pine-soft: #1c2d29;
   --c-brick-soft: #33201c;
   --c-scrim: rgb(0 0 0 / 60%);
-  --sw-teal: #5fc0b3;
-  --sw-blue: #7ea8e6;
-  --sw-plum: #c198d6;
-  --sw-amber: #e6b35a;
+  --sw-red: #f08080;
   --sw-rust: #e98d63;
+  --sw-orange: #f0a35e;
+  --sw-amber: #e6b35a;
+  --sw-gold: #ddc35a;
+  --sw-sand: #d2bb92;
+  --sw-brown: #c9a080;
   --sw-olive: #b4c46a;
+  --sw-lime: #a6d16a;
+  --sw-green: #7fcf8a;
+  --sw-forest: #8dbf9c;
+  --sw-mint: #74d6a6;
+  --sw-teal: #5fc0b3;
+  --sw-cyan: #6cc9e0;
+  --sw-sky: #79c3ef;
+  --sw-blue: #7ea8e6;
+  --sw-navy: #9db3e3;
+  --sw-indigo: #a3a8f0;
+  --sw-violet: #b59af0;
+  --sw-plum: #c198d6;
+  --sw-pink: #ec93d2;
   --sw-rose: #e68aa6;
   --sw-slate: #9aaabf;
+  --sw-gray: #ababab;
+  --custom-l-min: 0.72;
+  --custom-l-max: 0.86;
+  --item-tint: 20%;
   --shadow-float: 0 10px 30px rgb(0 0 0 / 50%), 0 2px 6px rgb(0 0 0 / 40%);
 }
 

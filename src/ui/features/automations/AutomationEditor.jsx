@@ -104,8 +104,8 @@ function withItem(draft, section, index, item) {
  * @property {AutomationDraft} initial
  * @property {string} title
  * @property {string} today
- * @property {readonly { id: string, name: string, currency: string }[]} accounts
- * @property {readonly { id: string, name: string, kind: string }[]} categories
+ * @property {readonly (import('../../components/itemOption.js').AccountChoice & { currency: string })[]} accounts
+ * @property {readonly import('../../components/itemOption.js').CategoryChoice[]} categories
  * @property {readonly string[]} currencies currencies of the user's accounts
  * @property {{ accountId: string, currency: string }} defaults for new checks and steps
  * @property {(draft: AutomationDraft) => Promise<void>} onSubmit throws ValidationError for inline errors

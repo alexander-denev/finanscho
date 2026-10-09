@@ -1,5 +1,5 @@
 import { Amount } from './Amount.jsx';
-import { Swatch } from './Swatch.jsx';
+import { ItemIcon } from './ItemIcon.jsx';
 import styles from './BalanceList.module.css';
 
 /**
@@ -8,6 +8,7 @@ import styles from './BalanceList.module.css';
  * @property {string} name
  * @property {string} [subtitle]
  * @property {string | null} color
+ * @property {import('./Icon.jsx').IconName} icon
  * @property {number} minor
  * @property {string} currency
  */
@@ -30,7 +31,7 @@ export function BalanceList({ items, onSelect, label }) {
       {items.map((item) => {
         const content = (
           <>
-            <Swatch color={item.color} />
+            <ItemIcon icon={item.icon} color={item.color} />
             <span className={styles.text}>
               <span className={styles.name}>{item.name}</span>
               {item.subtitle && <span className={styles.subtitle}>{item.subtitle}</span>}

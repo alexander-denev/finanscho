@@ -1,7 +1,8 @@
 import { AMOUNT_TYPES } from '../../../core/domain/automation.js';
+import { IconSelect } from '../../components/IconSelect.jsx';
+import { itemOption } from '../../components/itemOption.js';
 import { MoneyInput } from '../../components/MoneyInput.jsx';
 import { SegmentedControl } from '../../components/SegmentedControl.jsx';
-import { Select } from '../../components/Select.jsx';
 import { TextField } from '../../components/TextField.jsx';
 import { TransactionFields } from '../../components/TransactionFields.jsx';
 import { t } from '../../i18n/i18n.js';
@@ -9,6 +10,8 @@ import { FillInWordsHelp } from './FillInWordsHelp.jsx';
 import styles from './ActionFields.module.css';
 
 /** @typedef {import('./automationDraft.js').ActionDraft} ActionDraft */
+/** @typedef {import('../../components/itemOption.js').AccountChoice} AccountChoice */
+/** @typedef {import('../../components/itemOption.js').CategoryChoice} CategoryChoice */
 
 /**
  * @typedef {object} ActionFieldsProps
@@ -16,8 +19,8 @@ import styles from './ActionFields.module.css';
  * @property {Record<string, string>} errors this step's errors (path prefix removed)
  * @property {(patch: Partial<ActionDraft>) => void} onChange
  * @property {boolean} allowPercent every trigger is "a transaction is recorded"
- * @property {readonly { id: string, name: string, currency: string }[]} accounts
- * @property {readonly { id: string, name: string, kind: string }[]} categories
+ * @property {readonly (AccountChoice & { currency: string })[]} accounts
+ * @property {readonly CategoryChoice[]} categories
  */
 
 /**
@@ -92,14 +95,12 @@ export function ActionFields({ value, errors, onChange, allowPercent, accounts, 
     <div className={styles.root}>
       {value.type === 'setBudget' ? (
         <>
-          <Select
+          <IconSelect
             label={t('automations.budgetCategory')}
             value={value.budgetCategoryId}
             options={[
               { value: '', label: t('common.choose') },
-              ...categories
-                .filter((c) => c.kind === 'expense')
-                .map((c) => ({ value: c.id, label: c.name })),
+              ...categories.filter((c) => c.kind === 'expense').map((c) => itemOption(c)),
             ]}
             error={error('categoryId')}
             onChange={(budgetCategoryId) => onChange({ budgetCategoryId })}
