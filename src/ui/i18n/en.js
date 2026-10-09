@@ -328,8 +328,6 @@ export const EN = Object.freeze({
   'automations.empty.title': 'No automations yet',
   'automations.empty.body':
     'Let Finanscho do the routine work: add the rent on the 1st, set a budget every month, or move a share of each salary to savings.',
-  'automations.editExplainer':
-    'Changes apply from today on. What this automation already made stays as it is.',
   'automations.name': 'Name',
   'automations.startDate': 'Starts',
   'automations.startHint': 'Nothing dated before this day is made.',

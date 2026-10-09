@@ -103,7 +103,6 @@ function withItem(draft, section, index, item) {
  * @typedef {object} AutomationEditorProps
  * @property {AutomationDraft} initial
  * @property {string} title
- * @property {boolean} isEdit
  * @property {string} today
  * @property {readonly { id: string, name: string, currency: string }[]} accounts
  * @property {readonly { id: string, name: string, kind: string }[]} categories
@@ -125,7 +124,6 @@ function withItem(draft, section, index, item) {
 export function AutomationEditor({
   initial,
   title,
-  isEdit,
   today,
   accounts,
   categories,
@@ -424,7 +422,6 @@ export function AutomationEditor({
           </>
         }
       />
-      {isEdit && <InlineMessage>{t('automations.editExplainer')}</InlineMessage>}
       <TextField
         label={t('automations.name')}
         value={draft.name}

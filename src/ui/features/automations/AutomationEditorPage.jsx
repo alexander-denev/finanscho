@@ -172,7 +172,6 @@ export function AutomationEditorPage({ params }) {
         key={params.id ?? `new:${params.categoryId ?? ''}`}
         initial={initial}
         title={summary ? summary.automation.name : t('automations.add')}
-        isEdit={Boolean(summary)}
         today={today}
         accounts={pickerAccounts}
         categories={pickerCategories}
