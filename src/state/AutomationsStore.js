@@ -119,7 +119,7 @@ export class AutomationsStore {
 
   /**
    * @param {string} id
-   * @returns {Promise<{ transactions: number, budgets: number }>}
+   * @returns {Promise<{ transactions: number, toPays: number, budgets: number }>}
    */
   runNow(id) {
     return this.#service.runNow(id);

@@ -52,14 +52,16 @@ import { randomUuid } from '../../../shared/randomUuid.js';
 /** @typedef {{ match: string, items: Array<ConditionDraft | GroupDraft> }} ConditionsDraft */
 
 /**
- * One step. Create transaction uses the transaction fields; Set budget uses `budgetCategoryId`.
- * `amount` is the fixed amount or the percentage, as typed.
+ * One step. Create transaction and Create To pay use the transaction fields (a To pay also
+ * `dueInDays`, empty for no due date); Set budget uses `budgetCategoryId`. `amount` is the fixed
+ * amount or the percentage, as typed.
  * @typedef {TransactionDraft & {
  *   key: string,
- *   type: 'createTransaction' | 'setBudget',
+ *   type: 'createTransaction' | 'createToPay' | 'setBudget',
  *   amountType: 'fixed' | 'percent',
  *   budgetCategoryId: string,
  *   currency: string,
+ *   dueInDays: string,
  * }} ActionDraft
  */
 
@@ -141,7 +143,7 @@ export function groupDraft() {
 }
 
 /**
- * @param {'createTransaction' | 'setBudget'} type
+ * @param {ActionDraft['type']} type
  * @param {DraftDefaults} defaults
  * @returns {ActionDraft}
  */
@@ -160,6 +162,7 @@ export function actionDraft(type, defaults) {
     note: '',
     budgetCategoryId: '',
     currency: defaults.currency,
+    dueInDays: '',
   };
 }
 
@@ -289,7 +292,11 @@ export function automationToDraft(automation, { currencyOf, defaultCurrency, tod
       const { template, amount } = action;
       const currency = currencyOf(template.accountId);
       return {
-        ...actionDraft('createTransaction', { accountId: template.accountId, currency }),
+        ...actionDraft(action.type, { accountId: template.accountId, currency }),
+        dueInDays:
+          action.type === 'createToPay' && action.dueInDays !== null
+            ? String(action.dueInDays)
+            : '',
         kind: template.kind,
         toAccountId: template.toAccountId ?? '',
         categoryId: template.categoryId ?? '',
@@ -376,18 +383,18 @@ export function actionInput(action) {
     return { type: 'setBudget', categoryId: action.budgetCategoryId, amount };
   }
   const transfer = action.kind === 'transfer';
-  return {
-    type: 'createTransaction',
-    template: {
-      kind: action.kind,
-      accountId: action.accountId,
-      toAccountId: transfer ? action.toAccountId || null : null,
-      categoryId: transfer ? null : action.categoryId || null,
-      payee: action.payee,
-      note: action.note,
-    },
-    amount,
+  const template = {
+    kind: action.kind,
+    accountId: action.accountId,
+    toAccountId: transfer ? action.toAccountId || null : null,
+    categoryId: transfer ? null : action.categoryId || null,
+    payee: action.payee,
+    note: action.note,
   };
+  if (action.type === 'createToPay') {
+    return { type: 'createToPay', template, amount, dueInDays: action.dueInDays };
+  }
+  return { type: 'createTransaction', template, amount };
 }
 
 /**

@@ -36,8 +36,9 @@ function appendWord(text, word) {
 
 /**
  * One "Do" step: create a transaction (the usual transaction fields, a fixed amount or a share
- * of the recorded transaction, and fill-in words in payee and note) or set a budget. The kind of
- * step was chosen when it was added and doesn't change.
+ * of the recorded transaction, and fill-in words in payee and note), create a To pay (the same,
+ * plus how many days after it is made it is due), or set a budget. The kind of step was chosen when
+ * it was added and doesn't change.
  * @param {ActionFieldsProps} props
  * @returns {import('preact').JSX.Element}
  */
@@ -132,6 +133,16 @@ export function ActionFields({ value, errors, onChange, allowPercent, accounts, 
               ),
             }}
           />
+          {value.type === 'createToPay' && (
+            <TextField
+              label={t('common.optional', { label: t('automations.dueInDays') })}
+              hint={t('automations.dueInDaysHint')}
+              value={value.dueInDays}
+              error={error('dueInDays')}
+              autoComplete="off"
+              onInput={(dueInDays) => onChange({ dueInDays })}
+            />
+          )}
         </>
       )}
     </div>

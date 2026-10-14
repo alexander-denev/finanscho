@@ -278,6 +278,7 @@ describe('AutomationService', () => {
     const automation = await t.services.automations.create(rent({ startDate: '2024-05-16' }));
     expect(await t.services.automations.runNow(automation.id)).toEqual({
       transactions: 1,
+      toPays: 0,
       budgets: 0,
     });
     const [ran] = (await t.services.automations.history(automation.id)).transactions;

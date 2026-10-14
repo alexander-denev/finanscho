@@ -9,6 +9,7 @@
  * - results of a recorded transaction: `<automationId>:a<action>:<source transaction id>`
  * - Run now: `<automationId>:run:<random id>`
  * - budgets: the ordinary budget ID `<categoryId>:<YYYY-MM>`
+ * - To pays use the same IDs as transactions, in their own store (D59)
  *
  * Everything here is pure: results are built only from the automation's rule fields, the trigger
  * date, and the recorded transaction, never from fields that can change later (name, end date,
@@ -48,6 +49,7 @@ import {
 /** @typedef {import('./transaction.js').TransactionKind} TransactionKind */
 /** @typedef {import('./transaction.js').TransactionFields} TransactionFields */
 /** @typedef {import('./budget.js').Budget} Budget */
+/** @typedef {import('./toPay.js').ToPay} ToPay */
 
 export const MAX_TRIGGERS = 5;
 export const MAX_ACTIONS = 5;
@@ -67,7 +69,13 @@ export const FILL_IN_LOCALE = 'en';
 
 export const TRIGGER_TYPES = /** @type {const} */ (['schedule', 'transactionRecorded']);
 export const WEEKEND_RULES = /** @type {const} */ (['keep', 'before', 'after']);
-export const ACTION_TYPES = /** @type {const} */ (['createTransaction', 'setBudget']);
+export const ACTION_TYPES = /** @type {const} */ ([
+  'createTransaction',
+  'createToPay',
+  'setBudget',
+]);
+/** Most days a made To pay can be due after the day it is made. */
+export const MAX_DUE_IN_DAYS = 366;
 export const AMOUNT_TYPES = /** @type {const} */ (['fixed', 'percent']);
 export const MATCH_MODES = /** @type {const} */ (['all', 'any']);
 export const CONDITION_FIELDS = /** @type {const} */ ([
@@ -140,8 +148,13 @@ const WORD_PATTERN = /\{([A-Za-z]+)\}/g;
 /** @typedef {{ type: 'fixed', amountMinor: number } | { type: 'percent', basisPoints: number }} Amount */
 /** @typedef {Omit<TransactionFields, 'date' | 'amountMinor'>} ActionTemplate */
 /** @typedef {{ type: 'createTransaction', template: ActionTemplate, amount: Amount }} CreateTransactionAction */
+/**
+ * Makes a To pay holding the transaction (D59), due `dueInDays` after the day it is made (null: no
+ * due date).
+ * @typedef {{ type: 'createToPay', template: ActionTemplate, amount: Amount, dueInDays: number | null }} CreateToPayAction
+ */
 /** @typedef {{ type: 'setBudget', categoryId: string, currency: string, amount: Amount }} SetBudgetAction */
-/** @typedef {CreateTransactionAction | SetBudgetAction} Action */
+/** @typedef {CreateTransactionAction | CreateToPayAction | SetBudgetAction} Action */
 
 /**
  * An automation. Every field can be edited in place (D52); an edit to the rule fields moves
@@ -190,6 +203,7 @@ const WORD_PATTERN = /\{([A-Za-z]+)\}/g;
  * @property {{ kind: string, accountId: string, toAccountId?: string | null, categoryId?: string | null, payee?: string, note?: string }} [template]
  * @property {string} [categoryId] for setBudget
  * @property {AmountInput} amount
+ * @property {number | string | null} [dueInDays] for createToPay; empty means no due date
  */
 /**
  * @typedef {object} AutomationInput
@@ -469,7 +483,10 @@ function normalizeAction(input, path, refs, onlyEventTriggers, errors) {
     });
     errors[`${path}.amount`] = error;
     action = { type: 'setBudget', categoryId, currency: refs.defaultCurrency, amount };
-  } else if (input.type === 'createTransaction' && input.template) {
+  } else if (
+    (input.type === 'createTransaction' || input.type === 'createToPay') &&
+    input.template
+  ) {
     const template = input.template;
     /** @type {ActionTemplate} */
     let fields = {
@@ -509,7 +526,17 @@ function normalizeAction(input, path, refs, onlyEventTriggers, errors) {
     const currency = refs.accounts.get(template.accountId)?.currency ?? refs.defaultCurrency;
     const { amount, error } = normalizeAmount(input.amount, currency, { allowZero: false });
     errors[`${path}.amount`] = error;
-    action = { type: 'createTransaction', template: fields, amount };
+    if (input.type === 'createToPay') {
+      const text = String(input.dueInDays ?? '').trim();
+      const dueInDays = text === '' ? null : Number(text);
+      errors[`${path}.dueInDays`] =
+        dueInDays === null || inRange(dueInDays, 0, MAX_DUE_IN_DAYS)
+          ? null
+          : 'validation.dueInDays';
+      action = { type: 'createToPay', template: fields, amount, dueInDays };
+    } else {
+      action = { type: 'createTransaction', template: fields, amount };
+    }
   } else {
     errors[`${path}.type`] = 'validation.required';
     return {
@@ -895,6 +922,7 @@ export function fillWords(text, ctx, maxLength) {
  * A record an automation makes, without audit fields: the repository adds `createdAt` and
  * `updatedAt` from the clock it writes with. `sourceId` is the recorded transaction, if any.
  * @typedef {{ entity: 'transactions', record: Omit<Transaction, 'createdAt' | 'updatedAt'>, sourceId: string | null }
+ *   | { entity: 'toPays', record: Omit<ToPay, 'createdAt' | 'updatedAt'>, sourceId: string | null }
  *   | { entity: 'budgets', record: Omit<Budget, 'createdAt' | 'updatedAt'>, sourceId: string | null }} AutomationResult
  */
 
@@ -939,8 +967,8 @@ export function resultPrefix(automationId) {
 
 /**
  * @typedef {object} BuildContext
- * @property {string} id the result's ID (transactions)
- * @property {LocalDate} date the date the result is dated
+ * @property {string} id the result's ID (transactions and To pays)
+ * @property {LocalDate} date the date the result is dated (for a To pay, the day it is made)
  * @property {LocalDate} wordDate the date fill-in words use (the planned date)
  * @property {Transaction | null} source
  * @property {(accountId: string) => string | null} currencyOf
@@ -988,6 +1016,22 @@ function buildResult(automation, action, ctx) {
   const amountMinor = resolveAmount(action.amount, ctx.source);
   if (amountMinor === null || amountMinor <= 0) return null;
   const fill = { date: ctx.wordDate, source: ctx.source, sourceCurrency };
+  if (action.type === 'createToPay') {
+    return {
+      entity: 'toPays',
+      sourceId,
+      record: {
+        id: ctx.id,
+        ...action.template,
+        payee: fillWords(action.template.payee, fill, MAX_NAME_LENGTH),
+        note: fillWords(action.template.note, fill, MAX_TEXT_LENGTH),
+        amountMinor,
+        dueDate: action.dueInDays === null ? null : addDays(ctx.date, action.dueInDays),
+        automationId: automation.id,
+        deleted: false,
+      },
+    };
+  }
   return {
     entity: 'transactions',
     sourceId,
@@ -1008,6 +1052,7 @@ function buildResult(automation, action, ctx) {
  * @typedef {object} RunContext
  * @property {LocalDate} today
  * @property {Set<string>} existingIds transaction IDs under the automation's prefix, in any state
+ * @property {Set<string>} [existingToPayIds] To pay IDs under the automation's prefix, in any state
  * @property {Set<string>} existingBudgetIds every budget ID, in any state
  * @property {(accountId: string) => string | null} currencyOf null when the account is unknown here
  * @property {number} [cap] maximum results (default RUN_CAP)
@@ -1022,7 +1067,12 @@ function buildResult(automation, action, ctx) {
 function isNewResult(result, ctx, taken) {
   const id = result.record.id;
   if (taken.has(id)) return false;
-  const existing = result.entity === 'budgets' ? ctx.existingBudgetIds : ctx.existingIds;
+  const existing =
+    result.entity === 'budgets'
+      ? ctx.existingBudgetIds
+      : result.entity === 'toPays'
+        ? (ctx.existingToPayIds ?? new Set())
+        : ctx.existingIds;
   if (existing.has(id)) return false;
   taken.add(id);
   return true;

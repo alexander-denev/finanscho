@@ -399,6 +399,11 @@ export function AutomationEditor({
         description: t('automations.action.createTransactionHint'),
       },
       {
+        value: 'createToPay',
+        label: t('automations.action.createToPay'),
+        description: t('automations.action.createToPayHint'),
+      },
+      {
         value: 'setBudget',
         label: t('automations.action.setBudget'),
         description: t('automations.action.setBudgetHint'),

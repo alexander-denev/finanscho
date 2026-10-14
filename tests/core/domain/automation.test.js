@@ -42,10 +42,14 @@ const refs = {
 
 /**
  * @param {import('../../../src/core/domain/automation.js').AutomationResult} result
- * @returns {string} the transaction's date or the budget's month
+ * @returns {string} the transaction's date, the To pay's due date, or the budget's month
  */
 const dateOf = (result) =>
-  result.entity === 'transactions' ? result.record.date : result.record.month;
+  result.entity === 'transactions'
+    ? result.record.date
+    : result.entity === 'toPays'
+      ? (result.record.dueDate ?? '')
+      : result.record.month;
 
 /** @param {string} accountId */
 const currencyOf = (accountId) => refs.accounts.get(accountId)?.currency ?? null;

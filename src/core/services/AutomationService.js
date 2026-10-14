@@ -34,6 +34,7 @@ import { SETTING_KEYS } from './SettingsService.js';
 /** @typedef {import('../ports/repositories.js').AutomationRepository} AutomationRepository */
 /** @typedef {import('../ports/repositories.js').TransactionRepository} TransactionRepository */
 /** @typedef {import('../ports/repositories.js').BudgetRepository} BudgetRepository */
+/** @typedef {import('../ports/repositories.js').ToPayRepository} ToPayRepository */
 /** @typedef {import('../ports/repositories.js').AccountRepository} AccountRepository */
 /** @typedef {import('../ports/repositories.js').CategoryRepository} CategoryRepository */
 /** @typedef {import('../ports/repositories.js').SettingsRepository} SettingsRepository */
@@ -77,6 +78,7 @@ export class AutomationService {
   #automations;
   #transactions;
   #budgets;
+  #toPays;
   #accounts;
   #categories;
   #settings;
@@ -88,12 +90,23 @@ export class AutomationService {
   #again = null;
 
   /**
-   * @param {{ automations: AutomationRepository, transactions: TransactionRepository, budgets: BudgetRepository, accounts: AccountRepository, categories: CategoryRepository, settings: SettingsRepository, clock: Clock, ids: IdGenerator }} deps
+   * @param {{ automations: AutomationRepository, transactions: TransactionRepository, budgets: BudgetRepository, toPays: ToPayRepository, accounts: AccountRepository, categories: CategoryRepository, settings: SettingsRepository, clock: Clock, ids: IdGenerator }} deps
    */
-  constructor({ automations, transactions, budgets, accounts, categories, settings, clock, ids }) {
+  constructor({
+    automations,
+    transactions,
+    budgets,
+    toPays,
+    accounts,
+    categories,
+    settings,
+    clock,
+    ids,
+  }) {
     this.#automations = automations;
     this.#transactions = transactions;
     this.#budgets = budgets;
+    this.#toPays = toPays;
     this.#accounts = accounts;
     this.#categories = categories;
     this.#settings = settings;
@@ -260,7 +273,7 @@ export class AutomationService {
    * Does every step once, today, as if the user had entered it (fresh IDs and clocks). A Set
    * budget step replaces this month's budget.
    * @param {string} id
-   * @returns {Promise<{ transactions: number, budgets: number }>}
+   * @returns {Promise<{ transactions: number, toPays: number, budgets: number }>}
    * @throws {ValidationError} when a step uses a percentage (there is no transaction to take it of)
    */
   async runNow(id) {
@@ -274,11 +287,14 @@ export class AutomationService {
       () => this.#ids.newId(),
       currencyOf,
     );
-    const counts = { transactions: 0, budgets: 0 };
+    const counts = { transactions: 0, toPays: 0, budgets: 0 };
     for (const result of results) {
       if (result.entity === 'transactions') {
         await this.#transactions.create({ ...result.record, createdAt: now, updatedAt: now });
         counts.transactions += 1;
+      } else if (result.entity === 'toPays') {
+        await this.#toPays.create({ ...result.record, createdAt: now, updatedAt: now });
+        counts.toPays += 1;
       } else {
         const existing = await this.#budgets.get(result.record.id);
         await this.#budgets.put({
@@ -438,6 +454,7 @@ export class AutomationService {
       const ctx = {
         today,
         existingIds: await this.#transactions.idsWithPrefix(resultPrefix(automation.id)),
+        existingToPayIds: await this.#toPays.idsWithPrefix(resultPrefix(automation.id)),
         existingBudgetIds,
         currencyOf,
       };

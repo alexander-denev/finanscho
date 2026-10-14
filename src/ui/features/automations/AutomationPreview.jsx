@@ -43,6 +43,15 @@ export function AutomationPreview({ preview, hasSchedule, reacts, currencyOf, ca
             ) : (
               <>
                 <span className={styles.title}>
+                  {result.entity === 'toPays' && (
+                    <span className={styles.muted}>
+                      {result.record.dueDate
+                        ? t('automations.preview.toPayDue', {
+                            date: formatDate(result.record.dueDate, 'short'),
+                          })
+                        : t('automations.preview.toPay')}{' '}
+                    </span>
+                  )}
                   {result.record.payee ||
                     (result.record.categoryId ? categoryName(result.record.categoryId) : '') ||
                     t(`kind.${result.record.kind}`)}

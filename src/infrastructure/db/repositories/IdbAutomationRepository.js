@@ -111,29 +111,32 @@ export class IdbAutomationRepository {
    */
   async writeResults(automationId, results) {
     let written = 0;
-    await this.#recorder.transact(['automations', 'transactions', 'budgets'], async (ctx) => {
-      const automation = await ctx.get('automations', automationId);
-      if (!automation || !isVisible(automation)) return;
-      const clock = ruleClock(automation);
-      if (clock === null) return;
-      for (const result of results) {
-        if (await ctx.get(result.entity, result.record.id)) continue;
-        let at = isoOf(clock);
-        if (result.sourceId !== null) {
-          const source = await ctx.get('transactions', result.sourceId);
-          if (!source || !isVisible(source)) continue;
-          if (String(source.createdAt) > at) at = String(source.createdAt);
+    await this.#recorder.transact(
+      ['automations', 'transactions', 'toPays', 'budgets'],
+      async (ctx) => {
+        const automation = await ctx.get('automations', automationId);
+        if (!automation || !isVisible(automation)) return;
+        const clock = ruleClock(automation);
+        if (clock === null) return;
+        for (const result of results) {
+          if (await ctx.get(result.entity, result.record.id)) continue;
+          let at = isoOf(clock);
+          if (result.sourceId !== null) {
+            const source = await ctx.get('transactions', result.sourceId);
+            if (!source || !isVisible(source)) continue;
+            if (String(source.createdAt) > at) at = String(source.createdAt);
+          }
+          await ctx.write({
+            entity: result.entity,
+            id: result.record.id,
+            fields: { ...fieldsOf(result.record), createdAt: at, updatedAt: at },
+            origin: 'automation',
+            hlc: clock,
+          });
+          written += 1;
         }
-        await ctx.write({
-          entity: result.entity,
-          id: result.record.id,
-          fields: { ...fieldsOf(result.record), createdAt: at, updatedAt: at },
-          origin: 'automation',
-          hlc: clock,
-        });
-        written += 1;
-      }
-    });
+      },
+    );
     return written;
   }
 }

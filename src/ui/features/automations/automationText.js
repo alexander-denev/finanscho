@@ -178,8 +178,8 @@ export function describeGroup(group, names) {
 }
 
 /**
- * One step as a short line, e.g. "Expense €800.00 · Checking · Rent {month}" or "Set Groceries
- * budget to €300.00".
+ * One step as a short line, e.g. "Expense €800.00 · Checking · Rent {month}", "To pay: Expense
+ * €800.00 · Checking · Rent · due 5 days later", or "Set Groceries budget to €300.00".
  * @param {ActionDraft} action
  * @param {Names} names
  * @returns {string}
@@ -201,7 +201,20 @@ export function describeAction(action, names) {
     action.kind === 'transfer'
       ? `${names.account(action.accountId)} → ${names.account(action.toAccountId)}`
       : names.account(action.accountId);
-  return [`${t(`kind.${action.kind}`)} ${amount}`, where, action.payee, action.note]
+  const due =
+    action.type === 'createToPay' && action.dueInDays.trim() !== ''
+      ? Number(action.dueInDays) === 1
+        ? t('automations.text.dueInDay')
+        : t('automations.text.dueInDays', { days: action.dueInDays.trim() })
+      : '';
+  const what = `${t(`kind.${action.kind}`)} ${amount}`;
+  return [
+    action.type === 'createToPay' ? t('automations.text.toPay', { what }) : what,
+    where,
+    action.payee,
+    action.note,
+    due,
+  ]
     .filter((part) => part && part.trim())
     .join(' · ');
 }
