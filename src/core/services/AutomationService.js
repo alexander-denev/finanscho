@@ -431,6 +431,8 @@ export class AutomationService {
   }
 
   /**
+   * Runs every automation even when one fails to write (its IndexedDB transaction is rolled back,
+   * so it writes nothing); the first failure is thrown once the rest have run.
    * @param {boolean} events
    * @returns {Promise<number>}
    */
@@ -450,6 +452,8 @@ export class AutomationService {
       if (from <= today) sources = await this.#transactions.listInRange(from, today);
     }
     let written = 0;
+    /** @type {{ error: unknown } | null} */
+    let failed = null;
     for (const automation of automations) {
       const ctx = {
         today,
@@ -465,11 +469,17 @@ export class AutomationService {
         );
       }
       if (results.length === 0) continue;
-      written += await this.#automations.writeResults(automation.id, results);
+      try {
+        written += await this.#automations.writeResults(automation.id, results);
+      } catch (error) {
+        failed ??= { error };
+        continue;
+      }
       for (const result of results) {
         if (result.entity === 'budgets') existingBudgetIds.add(result.record.id);
       }
     }
+    if (failed) throw failed.error;
     return written;
   }
 
