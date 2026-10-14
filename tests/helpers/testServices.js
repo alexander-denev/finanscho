@@ -3,6 +3,7 @@ import { IdbCategoryRepository } from '../../src/infrastructure/db/repositories/
 import { IdbTransactionRepository } from '../../src/infrastructure/db/repositories/IdbTransactionRepository.js';
 import { IdbBudgetRepository } from '../../src/infrastructure/db/repositories/IdbBudgetRepository.js';
 import { IdbAutomationRepository } from '../../src/infrastructure/db/repositories/IdbAutomationRepository.js';
+import { IdbToPayRepository } from '../../src/infrastructure/db/repositories/IdbToPayRepository.js';
 import { IdbSettingsRepository } from '../../src/infrastructure/db/repositories/IdbSettingsRepository.js';
 import { IdbDeviceRepository } from '../../src/infrastructure/db/repositories/IdbDeviceRepository.js';
 import { IdbBackupRepository } from '../../src/infrastructure/db/repositories/IdbBackupRepository.js';
@@ -11,6 +12,7 @@ import { CategoryService } from '../../src/core/services/CategoryService.js';
 import { TransactionService } from '../../src/core/services/TransactionService.js';
 import { BudgetService } from '../../src/core/services/BudgetService.js';
 import { AutomationService } from '../../src/core/services/AutomationService.js';
+import { ToPayService } from '../../src/core/services/ToPayService.js';
 import { DashboardService } from '../../src/core/services/DashboardService.js';
 import { BackupService } from '../../src/core/services/BackupService.js';
 import { SettingsService } from '../../src/core/services/SettingsService.js';
@@ -31,6 +33,7 @@ export async function createTestServices(options = {}) {
     transactions: new IdbTransactionRepository({ db, recorder }),
     budgets: new IdbBudgetRepository({ db, recorder }),
     automations: new IdbAutomationRepository({ db, recorder }),
+    toPays: new IdbToPayRepository({ db, recorder }),
     settings: new IdbSettingsRepository({ db }),
     device: new IdbDeviceRepository({ db, newId: () => ids.newId() }),
     backup: new IdbBackupRepository({ db, recorder }),
@@ -40,6 +43,7 @@ export async function createTestServices(options = {}) {
   const transactions = new TransactionService({ ...repos, clock, ids });
   const budgets = new BudgetService({ ...repos, clock });
   const automations = new AutomationService({ ...repos, clock, ids });
+  const toPays = new ToPayService({ ...repos, clock, ids });
   const dashboard = new DashboardService({
     accounts,
     budgets,
@@ -59,6 +63,7 @@ export async function createTestServices(options = {}) {
       transactions,
       budgets,
       automations,
+      toPays,
       dashboard,
       backup,
       settings,

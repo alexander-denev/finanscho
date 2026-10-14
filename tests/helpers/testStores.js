@@ -3,6 +3,7 @@ import { CategoriesStore } from '../../src/state/CategoriesStore.js';
 import { TransactionsStore } from '../../src/state/TransactionsStore.js';
 import { BudgetsStore } from '../../src/state/BudgetsStore.js';
 import { AutomationsStore } from '../../src/state/AutomationsStore.js';
+import { ToPaysStore } from '../../src/state/ToPaysStore.js';
 import { DashboardStore } from '../../src/state/DashboardStore.js';
 import { SettingsStore } from '../../src/state/SettingsStore.js';
 import { SyncStore } from '../../src/state/SyncStore.js';
@@ -110,6 +111,7 @@ export async function createTestStores(options = {}) {
     transactions,
     budgets: new BudgetsStore({ budgetService: t.services.budgets, clock: t.clock }),
     automations: new AutomationsStore({ automationService: t.services.automations }),
+    toPays: new ToPaysStore({ toPayService: t.services.toPays }),
     dashboard: new DashboardStore({ dashboardService: t.services.dashboard }),
     settings: new SettingsStore({
       settingsService: t.services.settings,
@@ -131,6 +133,7 @@ export async function createTestStores(options = {}) {
     { store: stores.transactions, dependsOn: TransactionsStore.DEPENDS_ON },
     { store: stores.budgets, dependsOn: BudgetsStore.DEPENDS_ON },
     { store: stores.automations, dependsOn: AutomationsStore.DEPENDS_ON },
+    { store: stores.toPays, dependsOn: ToPaysStore.DEPENDS_ON },
     { store: stores.dashboard, dependsOn: DashboardStore.DEPENDS_ON },
   ]);
   await Promise.all([
@@ -139,6 +142,7 @@ export async function createTestStores(options = {}) {
     stores.transactions.load(),
     stores.budgets.load(),
     stores.automations.load(),
+    stores.toPays.load(),
     stores.dashboard.load(),
     stores.settings.load(),
     stores.sync.load(),
@@ -152,6 +156,7 @@ export async function createTestStores(options = {}) {
       stores.transactions.settled(),
       stores.budgets.settled(),
       stores.automations.settled(),
+      stores.toPays.settled(),
       stores.dashboard.settled(),
       stores.settings.settled(),
       stores.install.settled(),

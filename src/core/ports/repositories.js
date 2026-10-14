@@ -12,6 +12,7 @@
 /** @typedef {import('../domain/budget.js').Budget} Budget */
 /** @typedef {import('../domain/automation.js').Automation} Automation */
 /** @typedef {import('../domain/automation.js').AutomationResult} AutomationResult */
+/** @typedef {import('../domain/toPay.js').ToPay} ToPay */
 /** @typedef {import('../domain/localDate.js').LocalDate} LocalDate */
 /** @typedef {import('../domain/localDate.js').YearMonth} YearMonth */
 
@@ -92,6 +93,19 @@
  * @property {(id: string, changes: Partial<Automation>) => Promise<void>} update writes only the given fields
  * @property {(id: string, updatedAt: string) => Promise<void>} remove
  * @property {(automationId: string, results: AutomationResult[]) => Promise<number>} writeResults in one transaction, writes the results whose IDs don't exist in any state, with clocks every device derives the same way (docs/DECISIONS.md, D51); returns how many were written
+ */
+
+/**
+ * @typedef {object} ToPayRepository
+ * @property {() => Promise<ToPay[]>} list visible To pays, any order
+ * @property {(id: string) => Promise<ToPay | null>} get
+ * @property {(toPay: ToPay) => Promise<void>} create
+ * @property {(id: string, changes: Partial<ToPay>) => Promise<void>} update writes only the given fields
+ * @property {(id: string, updatedAt: string) => Promise<void>} remove
+ * @property {(id: string, today: LocalDate, now: string) => Promise<Transaction | null>} pay in one transaction, records the To pay's payment (`paymentFor`) and deletes the To pay; null when the To pay is gone
+ * @property {(accountId: string) => Promise<boolean>} hasAnyForAccount whether a visible To pay uses the account on either side
+ * @property {(categoryId: string) => Promise<boolean>} hasAnyForCategory whether a visible To pay uses the category
+ * @property {(prefix: string) => Promise<Set<string>>} idsWithPrefix IDs starting with `prefix`, in any state (including deleted and tombstone stubs)
  */
 
 /**

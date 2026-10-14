@@ -2,7 +2,7 @@ import { firstDayOfMonth, lastDayOfMonth } from '../../../core/domain/localDate.
 import { balanceEffect } from '../../../core/domain/transaction.js';
 import { isVisible } from '../../sync/merge.js';
 import { STORES, TX_INDEXES } from '../database.js';
-import { fieldsOf, toEntity, visibleEntity } from './recordMapping.js';
+import { fieldsOf, prefixRange, toEntity, visibleEntity } from './recordMapping.js';
 
 /** @typedef {import('../../../core/domain/transaction.js').Transaction} Transaction */
 /** @typedef {import('../../../core/ports/repositories.js').TransactionQuery} TransactionQuery */
@@ -19,15 +19,6 @@ import { fieldsOf, toEntity, visibleEntity } from './recordMapping.js';
  */
 function dayRange(from, to) {
   return IDBKeyRange.bound([from], [to, []]);
-}
-
-/**
- * Key range over every ID that starts with `prefix`.
- * @param {string} prefix
- * @returns {IDBKeyRange}
- */
-function prefixRange(prefix) {
-  return IDBKeyRange.bound(prefix, `${prefix}￿`);
 }
 
 /**

@@ -1,5 +1,5 @@
 /**
- * @typedef {'accounts' | 'categories' | 'transactions' | 'budgets' | 'automations'} ChangedEntity
+ * @typedef {'accounts' | 'categories' | 'transactions' | 'budgets' | 'automations' | 'toPays'} ChangedEntity
  * @typedef {{ entities: ChangedEntity[], source: 'local' | 'remote' }} ChangeEvent
  */
 

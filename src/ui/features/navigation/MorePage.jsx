@@ -5,6 +5,7 @@ import styles from './MorePage.module.css';
 
 /** @type {ReadonlyArray<{ href: string, labelKey: string, icon: import('../../components/Icon.jsx').IconName }>} */
 const LINKS = [
+  { href: '/to-pay', labelKey: 'nav.toPay', icon: 'receipt' },
   { href: '/automations', labelKey: 'nav.automations', icon: 'bolt' },
   { href: '/categories', labelKey: 'nav.categories', icon: 'tag' },
   { href: '/settings', labelKey: 'nav.settings', icon: 'settings' },

@@ -9,6 +9,7 @@ import { SETTING_KEYS } from './SettingsService.js';
 /** @typedef {import('../ports/repositories.js').CategoryRepository} CategoryRepository */
 /** @typedef {import('../ports/repositories.js').TransactionRepository} TransactionRepository */
 /** @typedef {import('../ports/repositories.js').AutomationRepository} AutomationRepository */
+/** @typedef {import('../ports/repositories.js').ToPayRepository} ToPayRepository */
 /** @typedef {import('../ports/repositories.js').SettingsRepository} SettingsRepository */
 /** @typedef {import('../ports/clock.js').Clock} Clock */
 /** @typedef {import('../ports/idGenerator.js').IdGenerator} IdGenerator */
@@ -18,17 +19,19 @@ export class CategoryService {
   #categories;
   #transactions;
   #automations;
+  #toPays;
   #settings;
   #clock;
   #ids;
 
   /**
-   * @param {{ categories: CategoryRepository, transactions: TransactionRepository, automations: AutomationRepository, settings: SettingsRepository, clock: Clock, ids: IdGenerator }} deps
+   * @param {{ categories: CategoryRepository, transactions: TransactionRepository, automations: AutomationRepository, toPays: ToPayRepository, settings: SettingsRepository, clock: Clock, ids: IdGenerator }} deps
    */
-  constructor({ categories, transactions, automations, settings, clock, ids }) {
+  constructor({ categories, transactions, automations, toPays, settings, clock, ids }) {
     this.#categories = categories;
     this.#transactions = transactions;
     this.#automations = automations;
+    this.#toPays = toPays;
     this.#settings = settings;
     this.#clock = clock;
     this.#ids = ids;
@@ -97,12 +100,13 @@ export class CategoryService {
   }
 
   /**
-   * Whether any transaction or automation (including ended ones) uses the category.
+   * Whether any transaction, To pay, or automation (including ended ones) uses the category.
    * @param {string} id
    * @returns {Promise<boolean>}
    */
   async isInUse(id) {
     if (await this.#transactions.hasAnyForCategory(id)) return true;
+    if (await this.#toPays.hasAnyForCategory(id)) return true;
     const automations = await this.#automations.list();
     return automations.some((a) => referencedIds(a).categoryIds.has(id));
   }
@@ -122,7 +126,7 @@ export class CategoryService {
   }
 
   /**
-   * Restores deleted categories that a transaction or automation uses again. That happens when another
+   * Restores deleted categories that a transaction, To pay, or automation uses again. That happens when another
    * device used an empty category while this one deleted it; the data wins over the delete.
    * Runs after every pull.
    * @returns {Promise<number>} how many categories were restored

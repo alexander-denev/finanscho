@@ -14,6 +14,7 @@ export const SYNCED_ENTITIES = /** @type {const} */ ([
   'transactions',
   'budgets',
   'automations',
+  'toPays',
 ]);
 
 /**

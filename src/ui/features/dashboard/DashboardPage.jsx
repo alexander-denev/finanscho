@@ -1,24 +1,36 @@
+import { useSignal } from '@preact/signals';
 import { accountIcon } from '../../../core/domain/account.js';
+import { addDays } from '../../../core/domain/localDate.js';
 import { useStores } from '../../context/StoresProvider.jsx';
 import { Amount } from '../../components/Amount.jsx';
 import { BalanceList } from '../../components/BalanceList.jsx';
 import { ButtonLink } from '../../components/ButtonLink.jsx';
+import { ConfirmDialog } from '../../components/ConfirmDialog.jsx';
 import { EmptyState } from '../../components/EmptyState.jsx';
 import { InlineMessage } from '../../components/InlineMessage.jsx';
 import { ItemIcon } from '../../components/ItemIcon.jsx';
 import { PageHeader } from '../../components/PageHeader.jsx';
 import { ProgressBar } from '../../components/ProgressBar.jsx';
+import { ToPayList } from '../../components/ToPayList.jsx';
+import { toPayListItem } from '../../components/toPayListItem.js';
 import { UpcomingList } from '../../components/UpcomingList.jsx';
+import { useToPayActions } from '../../hooks/useToPayActions.js';
 import { formatMonth, formatPercent, t } from '../../i18n/i18n.js';
 import { DashboardSection } from './DashboardSection.jsx';
 import styles from './DashboardPage.module.css';
 
+/** Days ahead a To pay is listed on the dashboard (like what automations make soon). */
+const TO_PAY_DAYS = 30;
+
 /**
- * Overview: balances, this month's flow, budget status, and what automations make soon.
+ * Overview: balances, this month's flow, budget status, and what's coming up: To pays (overdue,
+ * due within 30 days, or without a due date) and what automations make soon.
  * @returns {import('preact').JSX.Element}
  */
 export function DashboardPage() {
-  const { dashboard, categories, accounts, install } = useStores();
+  const { dashboard, categories, accounts, install, toPays, router, clock } = useStores();
+  const toPayActions = useToPayActions();
+  const deletingToPay = useSignal(/** @type {{ id: string, automatic: boolean } | null} */ (null));
   const summary = dashboard.summary.value;
   const categoryById = categories.byId.value;
   const accountById = accounts.byId.value;
@@ -80,6 +92,17 @@ export function DashboardPage() {
     };
   });
   const { lines, over, near } = summary.budgets;
+  const today = clock.today();
+  const lastDueDay = addDays(today, TO_PAY_DAYS);
+  const dueToPays = toPays.items.value
+    .filter((toPay) => toPay.dueDate === null || toPay.dueDate <= lastDueDay)
+    .map((toPay) => toPayListItem(toPay, { accounts: accountById, categories: categoryById }));
+
+  const removeToPay = async () => {
+    const target = deletingToPay.peek();
+    deletingToPay.value = null;
+    if (target) await toPayActions.remove(target.id);
+  };
 
   return (
     <>
@@ -202,8 +225,39 @@ export function DashboardPage() {
         title={t('dashboard.upcoming')}
         link={{ href: '/automations', label: t('dashboard.viewAll') }}
       >
-        <UpcomingList items={upcoming} emptyText={t('dashboard.noUpcoming')} />
+        {dueToPays.length > 0 && (
+          <ToPayList
+            label={t('toPay.list')}
+            items={dueToPays}
+            today={today}
+            disabled={toPayActions.busy.value}
+            onSelect={(id) => router.navigate(`/to-pay/${encodeURIComponent(id)}`)}
+            onPay={(id) => void toPayActions.pay(id)}
+            onDelete={(id) => {
+              const automatic = dueToPays.find((item) => item.id === id)?.automatic ?? false;
+              deletingToPay.value = { id, automatic };
+            }}
+          />
+        )}
+        {(upcoming.length > 0 || dueToPays.length === 0) && (
+          <UpcomingList items={upcoming} emptyText={t('dashboard.noUpcoming')} />
+        )}
       </DashboardSection>
+      <ConfirmDialog
+        open={deletingToPay.value !== null}
+        title={t('toPay.delete')}
+        message={
+          deletingToPay.value?.automatic
+            ? t('toPay.deleteAutomaticConfirm')
+            : t('toPay.deleteConfirm')
+        }
+        confirmLabel={t('toPay.delete')}
+        danger
+        onConfirm={() => void removeToPay()}
+        onCancel={() => {
+          deletingToPay.value = null;
+        }}
+      />
     </>
   );
 }

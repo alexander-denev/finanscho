@@ -10,6 +10,7 @@ import { IdbCategoryRepository } from '../infrastructure/db/repositories/IdbCate
 import { IdbTransactionRepository } from '../infrastructure/db/repositories/IdbTransactionRepository.js';
 import { IdbBudgetRepository } from '../infrastructure/db/repositories/IdbBudgetRepository.js';
 import { IdbAutomationRepository } from '../infrastructure/db/repositories/IdbAutomationRepository.js';
+import { IdbToPayRepository } from '../infrastructure/db/repositories/IdbToPayRepository.js';
 import { IdbSettingsRepository } from '../infrastructure/db/repositories/IdbSettingsRepository.js';
 import { IdbDeviceRepository } from '../infrastructure/db/repositories/IdbDeviceRepository.js';
 import { IdbBackupRepository } from '../infrastructure/db/repositories/IdbBackupRepository.js';
@@ -31,6 +32,7 @@ import { CategoryService } from '../core/services/CategoryService.js';
 import { TransactionService } from '../core/services/TransactionService.js';
 import { BudgetService } from '../core/services/BudgetService.js';
 import { AutomationService } from '../core/services/AutomationService.js';
+import { ToPayService } from '../core/services/ToPayService.js';
 import { DashboardService } from '../core/services/DashboardService.js';
 import { BackupService } from '../core/services/BackupService.js';
 import { SettingsService } from '../core/services/SettingsService.js';
@@ -39,6 +41,7 @@ import { CategoriesStore } from '../state/CategoriesStore.js';
 import { TransactionsStore } from '../state/TransactionsStore.js';
 import { BudgetsStore } from '../state/BudgetsStore.js';
 import { AutomationsStore } from '../state/AutomationsStore.js';
+import { ToPaysStore } from '../state/ToPaysStore.js';
 import { DashboardStore } from '../state/DashboardStore.js';
 import { SettingsStore } from '../state/SettingsStore.js';
 import { SyncStore } from '../state/SyncStore.js';
@@ -86,6 +89,7 @@ export async function createContainer({ window, registerServiceWorker }) {
     transactions: new IdbTransactionRepository({ db, recorder }),
     budgets: new IdbBudgetRepository({ db, recorder }),
     automations: new IdbAutomationRepository({ db, recorder }),
+    toPays: new IdbToPayRepository({ db, recorder }),
     settings: new IdbSettingsRepository({ db }),
   };
 
@@ -94,6 +98,7 @@ export async function createContainer({ window, registerServiceWorker }) {
   const transactionService = new TransactionService({ ...repos, clock, ids });
   const budgetService = new BudgetService({ ...repos, clock });
   const automationService = new AutomationService({ ...repos, clock, ids });
+  const toPayService = new ToPayService({ ...repos, clock, ids });
   const dashboardService = new DashboardService({
     accounts: accountService,
     budgets: budgetService,
@@ -158,6 +163,7 @@ export async function createContainer({ window, registerServiceWorker }) {
     transactions,
     budgets: new BudgetsStore({ budgetService, clock }),
     automations: new AutomationsStore({ automationService }),
+    toPays: new ToPaysStore({ toPayService }),
     dashboard: new DashboardStore({ dashboardService }),
     settings: new SettingsStore({ settingsService, backupService }),
     sync: new SyncStore({ syncControl: scheduler }),
@@ -179,6 +185,7 @@ export async function createContainer({ window, registerServiceWorker }) {
     { store: stores.transactions, dependsOn: TransactionsStore.DEPENDS_ON },
     { store: stores.budgets, dependsOn: BudgetsStore.DEPENDS_ON },
     { store: stores.automations, dependsOn: AutomationsStore.DEPENDS_ON },
+    { store: stores.toPays, dependsOn: ToPaysStore.DEPENDS_ON },
     { store: stores.dashboard, dependsOn: DashboardStore.DEPENDS_ON },
   ]);
 
@@ -188,6 +195,7 @@ export async function createContainer({ window, registerServiceWorker }) {
     stores.transactions.load(),
     stores.budgets.load(),
     stores.automations.load(),
+    stores.toPays.load(),
     stores.dashboard.load(),
     stores.settings.load(),
     stores.sync.load(),
@@ -199,6 +207,7 @@ export async function createContainer({ window, registerServiceWorker }) {
     // A failed run changes nothing; the next change or pull runs again.
     automationService.run().catch(() => {});
     void stores.automations.invalidate();
+    void stores.toPays.invalidate();
     void stores.budgets.invalidate();
     void stores.dashboard.invalidate();
   });

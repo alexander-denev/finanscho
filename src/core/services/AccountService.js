@@ -8,6 +8,7 @@ import { InUseError, NotFoundError } from '../errors.js';
 /** @typedef {import('../ports/repositories.js').AccountRepository} AccountRepository */
 /** @typedef {import('../ports/repositories.js').TransactionRepository} TransactionRepository */
 /** @typedef {import('../ports/repositories.js').AutomationRepository} AutomationRepository */
+/** @typedef {import('../ports/repositories.js').ToPayRepository} ToPayRepository */
 /** @typedef {import('../ports/clock.js').Clock} Clock */
 /** @typedef {import('../ports/idGenerator.js').IdGenerator} IdGenerator */
 
@@ -21,16 +22,18 @@ export class AccountService {
   #accounts;
   #transactions;
   #automations;
+  #toPays;
   #clock;
   #ids;
 
   /**
-   * @param {{ accounts: AccountRepository, transactions: TransactionRepository, automations: AutomationRepository, clock: Clock, ids: IdGenerator }} deps
+   * @param {{ accounts: AccountRepository, transactions: TransactionRepository, automations: AutomationRepository, toPays: ToPayRepository, clock: Clock, ids: IdGenerator }} deps
    */
-  constructor({ accounts, transactions, automations, clock, ids }) {
+  constructor({ accounts, transactions, automations, toPays, clock, ids }) {
     this.#accounts = accounts;
     this.#transactions = transactions;
     this.#automations = automations;
+    this.#toPays = toPays;
     this.#clock = clock;
     this.#ids = ids;
   }
@@ -145,12 +148,13 @@ export class AccountService {
   }
 
   /**
-   * Whether any transaction or automation (including ended ones) uses the account.
+   * Whether any transaction, To pay, or automation (including ended ones) uses the account.
    * @param {string} id
    * @returns {Promise<boolean>}
    */
   async isInUse(id) {
     if (await this.#transactions.hasAnyForAccount(id)) return true;
+    if (await this.#toPays.hasAnyForAccount(id)) return true;
     const automations = await this.#automations.list();
     return automations.some((a) => referencedIds(a).accountIds.has(id));
   }
@@ -169,7 +173,7 @@ export class AccountService {
   }
 
   /**
-   * Restores deleted accounts that a transaction or automation uses again. That happens when another
+   * Restores deleted accounts that a transaction, To pay, or automation uses again. That happens when another
    * device used an empty account while this one deleted it; the data wins over the delete.
    * Runs after every pull.
    * @returns {Promise<number>} how many accounts were restored

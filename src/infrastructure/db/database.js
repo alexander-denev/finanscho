@@ -19,6 +19,7 @@ export const STORES = /** @type {const} */ ({
   transactions: 'transactions',
   budgets: 'budgets',
   automations: 'automations',
+  toPays: 'toPays',
   outbox: 'outbox',
   syncCursors: 'syncCursors',
   meta: 'meta',
@@ -33,6 +34,13 @@ export const TX_INDEXES = /** @type {const} */ ({
   categoryId: 'categoryId',
   categoryDate: 'categoryId_date',
   dateCreated: 'date_createdAt',
+});
+
+/** Index names on the To pays store. */
+export const TO_PAY_INDEXES = /** @type {const} */ ({
+  accountId: 'accountId',
+  toAccountId: 'toAccountId',
+  categoryId: 'categoryId',
 });
 
 /**
@@ -72,6 +80,14 @@ const MIGRATIONS = [
     tx.objectStore(STORES.transactions).deleteIndex('recurringRuleId');
     db.deleteObjectStore('recurringRules');
     db.createObjectStore(STORES.automations, { keyPath: 'id' });
+  },
+  // v3: To pays (docs/DECISIONS.md, D58), with the indexes that tell whether an account or a
+  // category is in use.
+  (db) => {
+    const toPays = db.createObjectStore(STORES.toPays, { keyPath: 'id' });
+    toPays.createIndex(TO_PAY_INDEXES.accountId, 'accountId');
+    toPays.createIndex(TO_PAY_INDEXES.toAccountId, 'toAccountId');
+    toPays.createIndex(TO_PAY_INDEXES.categoryId, 'categoryId');
   },
 ];
 

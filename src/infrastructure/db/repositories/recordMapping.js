@@ -58,3 +58,12 @@ export function fieldsOf(entity) {
 export function byName(a, b) {
   return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
 }
+
+/**
+ * Key range over every ID that starts with `prefix`.
+ * @param {string} prefix
+ * @returns {IDBKeyRange}
+ */
+export function prefixRange(prefix) {
+  return IDBKeyRange.bound(prefix, `${prefix}￿`);
+}

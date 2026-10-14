@@ -5,7 +5,7 @@
 
 /**
  * Entity collections that can change.
- * @typedef {'accounts' | 'categories' | 'transactions' | 'budgets' | 'automations'} ChangedEntity
+ * @typedef {'accounts' | 'categories' | 'transactions' | 'budgets' | 'automations' | 'toPays'} ChangedEntity
  */
 
 /**

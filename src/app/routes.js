@@ -4,6 +4,7 @@ import { BudgetsPage } from '../ui/features/budgets/BudgetsPage.jsx';
 import { AccountsPage } from '../ui/features/accounts/AccountsPage.jsx';
 import { AutomationsPage } from '../ui/features/automations/AutomationsPage.jsx';
 import { AutomationEditorPage } from '../ui/features/automations/AutomationEditorPage.jsx';
+import { ToPayPage } from '../ui/features/toPay/ToPayPage.jsx';
 import { CategoriesPage } from '../ui/features/categories/CategoriesPage.jsx';
 import { SettingsPage } from '../ui/features/settings/SettingsPage.jsx';
 import { MorePage } from '../ui/features/navigation/MorePage.jsx';
@@ -23,6 +24,9 @@ export const ROUTES = [
   { path: '/automations/new', component: AutomationEditorPage },
   { path: '/automations/new/budget/:categoryId/:limit', component: AutomationEditorPage },
   { path: '/automations/:id', component: AutomationEditorPage },
+  // '/to-pay/new' (add) and '/to-pay/<id>' (open one) are handled by the page.
+  { path: '/to-pay', component: ToPayPage },
+  { path: '/to-pay/:id', component: ToPayPage },
   { path: '/categories', component: CategoriesPage },
   { path: '/settings', component: SettingsPage },
   { path: '/more', component: MorePage },
