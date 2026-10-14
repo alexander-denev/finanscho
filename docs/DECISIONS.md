@@ -797,3 +797,65 @@ icons visible wherever accounts and categories are shown or picked.
   automation editor's item keys use it. IDs keep the same format, so sync is unaffected.
 - **Still HTTPS-only over a LAN address:** the service worker (offline use, install) and
   persistent storage. Production is served over HTTPS, so this only affects testing on a phone.
+
+## 2026-10-15
+
+### D58. To pays: payments still to make by hand
+
+User request: "like a To-do, but for payments the user must make manually". The app had no
+To-do to build on, so To pays are a new synced record type, `toPays` (schema v3). Design by the
+user, after a proposal with status tracking was turned down:
+
+- **What it is.** The transaction it will record, without a date (type, account, to-account,
+  category, payee, note, amount), plus an optional `dueDate`. All three types are allowed, so the
+  form is the transaction form unchanged.
+- **No status, no tracking** (user decision). A To pay can be added, edited, deleted, or paid.
+  **Pay** records the transaction exactly as the To pay holds it, **dated today** (user decision),
+  and deletes the To pay, in one IndexedDB transaction (`IdbToPayRepository.pay`). Pay in the
+  edit window saves the form first, so it pays what is shown. Pay asks nothing (user: "it just
+  creates a transaction"); Delete asks first.
+- **Paying twice offline.** The payment's ID is `paid:<toPayId>`, so two devices paying the same
+  To pay write one merged transaction (the later write's date wins). The To pay keeps no link to it.
+  The `paid:` prefix stays clear of `<automationId>:`, which the automation history and the
+  "already made" checks scan. The payment is the user's own (`automationId: null`), so it can set
+  off "a transaction is recorded" like any transaction they enter.
+- **Edits** change only the To pay (user: "no other data object reacts") and write only the
+  changed fields; `automationId` never changes.
+- **Due date.** The row says the date and the days left; **yellow on the due date only**, red when
+  overdue (user decisions), using the budget "near" and "over" tokens. The text says it too.
+- **Where.** A "To pay" page (`/to-pay`, sidebar and More; `/to-pay/new` and `/to-pay/<id>`
+  open the dialog), and the dashboard's "Coming up in the next 30 days" lists To pays that are
+  overdue, due within 30 days, or have no due date, above the scheduled transactions (user
+  decision). Features may not use each other's containers (D50), so tapping one on the dashboard
+  goes to `/to-pay/<id>`; Pay and Delete work on the dashboard row (`ui/hooks/useToPayActions.js`).
+  These are the first list rows with buttons of their own; the row itself is a separate button.
+- **In use.** A To pay keeps its accounts and category from being deleted, and restores them after
+  a pull (as D42/D48), through `accountId`, `toAccountId`, and `categoryId` indexes.
+- **Compatibility.** The vault format and backup format stay 1. Older app versions set `toPays`
+  ops aside ("some changes need a newer version"), so every device should be updated; an older
+  version importing a newer backup leaves its To pays out. Payments are ordinary transactions.
+- Notifications were considered and left out: the app has no server to send them.
+
+### D59. The "Create a To pay" automation step
+
+User request: an automation step that makes To pays. The trigger decides when one is made, the
+step holds its fields (user: "properties of two different data objects"), like Create transaction.
+
+- The step is Create transaction's fields (fixed amount or a percentage of the recorded
+  transaction, fill-in words in payee and note) plus `dueInDays`: due that many days after the day
+  it is made (0–366), or no due date when empty. A fixed calendar date makes no sense on a repeating
+  step.
+- Results use the same predictable IDs as transactions, in the `toPays` store, written with the
+  rule clock in the same IndexedDB transaction (D51). A To pay with that ID in any state is never
+  made or touched again: paying (which deletes it), deleting, and editing are all final. Run now
+  makes one with a fresh ID. The "Next 30 days" preview of scheduled transactions leaves To pays
+  out; they show once made.
+- Made To pays carry `automationId`: the "Automatic" badge on the row and "Made by the automation
+  …" with Open automation (or "…that was deleted") in the window, like transactions.
+
+### D60. One failing automation no longer stops the run
+
+Found while adding D59: a write error in one automation's results ended `AutomationService.run`,
+so automations after it (by name) waited for the next run. Each automation writes in its own
+IndexedDB transaction, so a failure leaves nothing half-written; the run now carries on and throws
+the first error at the end, as before.

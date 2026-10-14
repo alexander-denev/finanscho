@@ -56,7 +56,7 @@ files — import each module from its own file, with the extension.
 - `app`: `createContainer.js` builds infrastructure → services → stores, binds store
   invalidation to the change feed (`storeInvalidation.js`), starts sync/midnight timers.
 - Store signals: `AccountsStore.items/active/archived/totals/byId`, `TransactionsStore.days/total`,
-  `BudgetsStore.data/totals`, `AutomationsStore.automations/upcoming`, `SyncStore.syncStatus` (live sync state) + `config`,
+  `BudgetsStore.data/totals`, `AutomationsStore.automations/upcoming`, `ToPaysStore.items`, `SyncStore.syncStatus` (live sync state) + `config`,
   `InstallStore.installed/canPrompt/guidance/persisted/showBanner` (install + storage protection).
 - Feature folders: `ui/features/<feature>/` hold the page + feature-specific components. A
   component used by two or more features moves to `ui/components` and becomes feature-agnostic.
@@ -100,11 +100,12 @@ UPPER_SNAKE_CASE only for true constants, `onX` for callback props.
 - IDs: `crypto.randomUUID()` via injected generator; deterministic IDs where devices may create
   the same record: seeded categories `seed:<slug>`, budgets `<categoryId>:<YYYY-MM>`, automation
   results `<automationId>:t<i>:a<j>:<YYYY-MM-DD>` (schedule) and `<automationId>:a<j>:<sourceId>`
-  (recorded transaction).
+  (recorded transaction), the payment of a To pay `paid:<toPayId>`.
 - **Automations** (D50–D55): When (calendar-style schedules: every N days/weeks/months/years on
   chosen weekdays, a day of the month or the Nth weekday, or a date; `phase` instead of a start
   date, see `repeatSchedule.js`; or "a transaction is recorded") → If (all/any checks,
-  groups one level deep) → Do (create transaction with a fixed or % amount; set budget). They
+  groups one level deep) → Do (create transaction with a fixed or % amount; create a To pay, the
+  same plus an optional due-in-days; set budget). They
   automate the user's input: results are ordinary records with only an `automationId`, and edits
   never touch existing results. Edited in place; an edit to When/If/Do moves `startDate` to
   today, Stop sets `endDate` to yesterday, Resume sets `startDate` to today, so nothing in the
@@ -120,7 +121,13 @@ UPPER_SNAKE_CASE only for true constants, `onX` for callback props.
   groups); every icon needs `icon.<key>` and `iconTags.<key>` strings. Account `icon: null` means
   the type's icon (`accountIcon`). Colors are a swatch name or a custom `#rrggbb`; edits keep an
   icon or color this version doesn't know.
-- Accounts and categories can be deleted only when no transaction or automation uses them; after
+- **To pays** (D58, D59): a payment still to make by hand: the transaction it will record (no
+  date) plus an optional `dueDate`. No status: create, edit, delete, or pay. Pay records the
+  transaction dated today as the user's own (`paid:<toPayId>`, so two devices paying offline
+  record it once) and deletes the To pay, in one IndexedDB transaction. Editing changes only the To
+  pay; `automationId` (set by the Create To pay step) only feeds the "Automatic" badge and "Made
+  by". The row shows the days left: yellow on the due date, red after it.
+- Accounts and categories can be deleted only when no transaction, To pay, or automation uses them; after
   a pull, deleted ones that are used again are restored (D42, D48, D53). Income and expenses may be
   uncategorized.
 - **Balance adjustments** (D49): "Reconcile balance" records one uncategorized income/expense dated

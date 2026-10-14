@@ -32,9 +32,9 @@ per folder, plus `import-x/no-cycle`:
 
 | Folder                        | Contents                                                                                                                                                                                                                                          |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/core/domain`             | Pure rules: money (minor units), local dates, entity factories/validators, calendar-style repeat schedules, automations (When/If/Do, result building). No I/O, no clock.                                                                          |
+| `src/core/domain`             | Pure rules: money (minor units), local dates, entity factories/validators, calendar-style repeat schedules, automations (When/If/Do, result building), To pays. No I/O, no clock.                                                                 |
 | `src/core/ports`              | JSDoc contracts: repositories, clock, id generator, change feed, credential store, sync transport/control.                                                                                                                                        |
-| `src/core/services`           | Use cases with constructor injection: accounts, categories, transactions, budgets, automations, dashboard, backup, settings.                                                                                                                      |
+| `src/core/services`           | Use cases with constructor injection: accounts, categories, transactions, budgets, automations, To pays, dashboard, backup, settings.                                                                                                             |
 | `src/core/errors.js`          | Typed errors (`ValidationError`, `NotFoundError`, `BackupError`, `SyncError`) with stable codes for i18n.                                                                                                                                         |
 | `src/infrastructure/db`       | `database.js` (schema + migrations), `ChangeRecorder` (the only entity writer), IndexedDB repositories, credential store.                                                                                                                         |
 | `src/infrastructure/sync`     | `HybridLogicalClock`, `operation.js`, `deviceHead.js`, `merge.js` (pure LWW merge), `SyncEngine` (pull/push), `SyncScheduler` (triggers, backoff, status), `webdav/` (client, adapters).                                                          |
@@ -106,7 +106,7 @@ which first builds `BrowserInstallEnvironment` so an early `beforeinstallprompt`
 4. build the sync scheduler (`fetch` on every platform) and the stores;
 5. bind store invalidation and the debounced automation run after local transaction changes
    (`runAutomationsOnChange`), load all stores;
-6. start the local-midnight timer (runs automations), ask for persistent storage where that never prompts
+6. start the local-midnight timer (runs automations, refreshes the To pay countdown), ask for persistent storage where that never prompts
    (`InstallStore.protectSilently`, D38), start sync in the background;
 7. register the service worker (`infrastructure/platform/serviceWorker.js`).
 

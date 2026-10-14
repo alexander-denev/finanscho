@@ -12,7 +12,7 @@ requires two devices to write the same file.
 ### 1.1 Records
 
 Every synced entity record (`accounts`, `categories`, `transactions`, `budgets`,
-`automations`) is stored as its plain fields plus sync metadata:
+`automations`, `toPays`) is stored as its plain fields plus sync metadata:
 
 ```json
 {
@@ -82,7 +82,7 @@ between devices. Rules:
 
 - `v`: op format version (1). Ops with a higher `v` are skipped and reported, never half-applied.
 - `seq`: the device's local sequence number, gap-free and strictly increasing from 1.
-- `entity`: one of `accounts`, `categories`, `transactions`, `budgets`, `automations`.
+- `entity`: one of `accounts`, `categories`, `transactions`, `budgets`, `automations`, `toPays`.
   Ops for unknown entities are skipped (kept on the server for newer clients). Ops for retired
   entities (`recurringRules`, written by versions before automations, D50) are dropped.
 - `fields`: the field values written. A create contains every field; an edit contains only the
