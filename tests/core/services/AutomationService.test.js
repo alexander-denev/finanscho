@@ -335,6 +335,25 @@ describe('AutomationService', () => {
     expect(await t.services.automations.run()).toBe(366);
   });
 
+  it('runs the other automations when one fails to write, then reports the failure', async () => {
+    // Created with a later start, so nothing is made until the run below.
+    const broken = await t.services.automations.create(
+      rent({ name: 'A broken one', startDate: '2024-06-01' }),
+    );
+    const fine = await t.services.automations.create(
+      rent({ name: 'B fine one', startDate: '2024-06-01' }),
+    );
+    const writeResults = t.repos.automations.writeResults.bind(t.repos.automations);
+    t.repos.automations.writeResults = async (id, results) => {
+      if (id === broken.id) throw new Error('disk full');
+      return writeResults(id, results);
+    };
+    t.clock.set('2024-06-30T09:00:00.000Z');
+    await expect(t.services.automations.run()).rejects.toThrow('disk full');
+    expect(await made(broken.id)).toHaveLength(0);
+    expect(await made(fine.id)).toHaveLength(1);
+  });
+
   it('runs one at a time and once more for calls made meanwhile', async () => {
     await t.services.automations.create(save());
     await income();
