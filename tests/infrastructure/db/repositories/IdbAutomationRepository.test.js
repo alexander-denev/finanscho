@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { STORES } from '../../../../src/infrastructure/db/database.js';
 import { IdbAutomationRepository } from '../../../../src/infrastructure/db/repositories/IdbAutomationRepository.js';
+import { IdbToPayRepository } from '../../../../src/infrastructure/db/repositories/IdbToPayRepository.js';
 import { IdbTransactionRepository } from '../../../../src/infrastructure/db/repositories/IdbTransactionRepository.js';
 import { HybridLogicalClock } from '../../../../src/infrastructure/sync/HybridLogicalClock.js';
 import { createTestDb } from '../../../helpers/testDb.js';
@@ -92,6 +93,41 @@ describe('IdbAutomationRepository', () => {
     await repo.remove('b', 'u');
     expect(await repo.get('b')).toBeNull();
     expect((await repo.get('auto'))?.triggers).toEqual(automation.triggers);
+  });
+
+  it('writes To pays with the rule clock, never over a paid or deleted one', async () => {
+    /**
+     * @param {string} id
+     * @returns {AutomationResult}
+     */
+    const toPay = (id) => ({
+      entity: 'toPays',
+      sourceId: null,
+      record: {
+        id,
+        kind: 'expense',
+        amountMinor: 100,
+        accountId: 'a1',
+        toAccountId: null,
+        categoryId: null,
+        payee: 'Power',
+        note: '',
+        dueDate: '2024-02-06',
+        automationId: 'auto',
+        deleted: false,
+      },
+    });
+    expect(await repo.writeResults('auto', [toPay('auto:p'), toPay('auto:q')])).toBe(2);
+    const ruleClock = (await env.db.get(STORES.automations, 'auto'))._clocks.triggers;
+    const p = await env.db.get(STORES.toPays, 'auto:p');
+    expect(p).toMatchObject({ payee: 'Power', dueDate: '2024-02-06', automationId: 'auto' });
+    expect(Object.values(p._clocks).every((c) => c === ruleClock)).toBe(true);
+
+    const toPays = new IdbToPayRepository({ db: env.db, recorder: env.recorder });
+    await toPays.pay('auto:p', '2024-02-03', '2024-02-03T08:00:00.000Z');
+    await toPays.remove('auto:q', 'u');
+    expect(await repo.writeResults('auto', [toPay('auto:p'), toPay('auto:q')])).toBe(0);
+    expect(await toPays.list()).toEqual([]);
   });
 
   it('writes results once, with the rule clock and its time, never over a deleted one', async () => {

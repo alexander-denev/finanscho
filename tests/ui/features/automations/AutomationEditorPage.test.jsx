@@ -147,6 +147,67 @@ describe('AutomationEditorPage', () => {
     expect(upcoming.map((u) => u.date)).toEqual(['2024-05-24', '2024-06-07']);
   });
 
+  it('adds a Create To pay step with a due date and makes the To pay on its schedule', async () => {
+    const ui = await setup();
+    await add('Add a When', /^On a schedule/);
+    await done(await dialog('Schedule'));
+    await add('Add a step', /^Create a To pay/);
+    const d = await dialog('Create a To pay');
+    fireEvent.input(within(d).getByLabelText('Amount'), { target: { value: '60' } });
+    fireEvent.input(within(d).getByLabelText('Payee (optional)'), { target: { value: 'Power' } });
+    const due = within(d).getByLabelText('Due this many days after it’s made (optional)');
+    fireEvent.input(due, { target: { value: 'soon' } });
+    fireEvent.click(within(d).getByRole('button', { name: 'Done' }));
+    expect(
+      await within(d).findByText('Enter a whole number of days from 0 to 366, or leave it empty.'),
+    ).toBeTruthy();
+    fireEvent.input(due, { target: { value: '5' } });
+    await done(d);
+    expect(
+      within(section('Do')).getByRole('button', {
+        name: 'To pay: Expense €60.00 · Checking · Power · due 5 days later',
+      }),
+    ).toBeTruthy();
+    fireEvent.input(screen.getByLabelText('Name'), { target: { value: 'Power bill' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save automation' }));
+    await waitFor(() => expect(ui.stores.router.currentPath.value).toBe('/automations'));
+    // Every month on day 15 (today): today's To pay is made at once, due in 5 days.
+    await ui.settled();
+    expect(ui.stores.toPays.items.value).toMatchObject([
+      { payee: 'Power', amountMinor: 6000, dueDate: '2024-05-20' },
+    ]);
+  });
+
+  it('opens a saved Create To pay step with its due date', async () => {
+    await setup(savedRent, async (u, ids) => {
+      await u.stores.automations.create({
+        name: 'Power bill',
+        startDate: '2024-06-01',
+        triggers: [
+          { type: 'schedule', every: 1, unit: 'month', monthDay: { kind: 'day', day: 1 } },
+        ],
+        actions: [
+          {
+            type: 'createToPay',
+            template: { kind: 'expense', accountId: ids.checking, payee: 'Power' },
+            amount: { type: 'fixed', value: '60' },
+            dueInDays: '1',
+          },
+        ],
+      });
+    });
+    const line = within(section('Do')).getByRole('button', {
+      name: 'To pay: Expense €60.00 · Checking · Power · due 1 day later',
+    });
+    fireEvent.click(line);
+    const d = await dialog('Create a To pay');
+    expect(
+      /** @type {HTMLInputElement} */ (
+        within(d).getByLabelText('Due this many days after it’s made (optional)')
+      ).value,
+    ).toBe('1');
+  });
+
   it('edits a group of checks in its own window', async () => {
     await setup();
     await add('Add a When', /^When a transaction is recorded/);

@@ -356,4 +356,91 @@ describe('AutomationService', () => {
     await expect(t.services.accounts.remove(other.id)).rejects.toBeInstanceOf(InUseError);
     await expect(t.services.categories.remove('seed:housing')).resolves.toBeUndefined();
   });
+
+  describe('Create To pay', () => {
+    /**
+     * Every month on day 1 from 2024-05-01, a To pay due 5 days later.
+     * @returns {AutomationInput}
+     */
+    const bill = () =>
+      rent({
+        name: 'Power bill',
+        startDate: '2024-05-01',
+        triggers: [
+          { type: 'schedule', every: 1, unit: 'month', monthDay: { kind: 'day', day: 1 } },
+        ],
+        actions: [
+          {
+            type: 'createToPay',
+            template: {
+              kind: 'expense',
+              accountId: checking,
+              categoryId: 'seed:utilities',
+              payee: 'Power company',
+              note: '{month}',
+            },
+            amount: { type: 'fixed', value: '60' },
+            dueInDays: '5',
+          },
+        ],
+      });
+
+    it('makes a To pay on each date, never again once it is paid or deleted', async () => {
+      const automation = await t.services.automations.create(bill());
+      const [may] = await t.services.toPays.list();
+      expect(may).toMatchObject({
+        payee: 'Power company',
+        note: 'May',
+        amountMinor: 6000,
+        dueDate: '2024-05-06',
+        automationId: automation.id,
+      });
+      // It is a To pay, not a transaction: nothing is recorded yet.
+      expect((await t.services.transactions.query({ limit: 10 })).items).toEqual([]);
+
+      await t.services.toPays.pay(may.id);
+      expect(await t.services.automations.run()).toBe(0);
+      t.clock.set('2024-06-01T09:00:00.000Z');
+      expect(await t.services.automations.run()).toBe(1);
+      const [june] = await t.services.toPays.list();
+      expect(june).toMatchObject({ note: 'June', dueDate: '2024-06-06' });
+      await t.services.toPays.remove(june.id);
+      expect(await t.services.automations.run()).toBe(0);
+      expect(await t.services.toPays.list()).toEqual([]);
+    });
+
+    it('never touches a To pay it made once the user edited it', async () => {
+      await t.services.automations.create(bill());
+      const [may] = await t.services.toPays.list();
+      await t.services.toPays.edit(may.id, {
+        kind: 'expense',
+        amount: '75',
+        accountId: checking,
+        categoryId: 'seed:utilities',
+        payee: 'Power company',
+        note: 'May (higher)',
+        dueDate: '',
+      });
+      expect(await t.services.automations.run()).toBe(0);
+      expect(await t.services.toPays.get(may.id)).toMatchObject({
+        amountMinor: 7500,
+        note: 'May (higher)',
+        dueDate: null,
+      });
+    });
+
+    it('runs now: a To pay made today', async () => {
+      const automation = await t.services.automations.create({
+        ...bill(),
+        startDate: '2024-06-01',
+      });
+      expect(await t.services.toPays.list()).toEqual([]);
+      expect(await t.services.automations.runNow(automation.id)).toEqual({
+        transactions: 0,
+        toPays: 1,
+        budgets: 0,
+      });
+      expect((await t.services.toPays.list())[0]).toMatchObject({ dueDate: '2024-05-20' });
+    });
+  });
 });

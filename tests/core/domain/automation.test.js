@@ -614,4 +614,86 @@ describe('automation results', () => {
       categoryIds: new Set(['salary', 'rent']),
     });
   });
+
+  describe('Create To pay', () => {
+    /**
+     * @param {number | string | null} dueInDays
+     * @returns {AutomationInput}
+     */
+    const billInput = (dueInDays) =>
+      rentInput({
+        actions: [{ ...rentInput().actions[0], type: 'createToPay', dueInDays }],
+      });
+
+    it('stores the days until due, or none', () => {
+      const [step] = build(billInput('5')).actions;
+      expect(step).toMatchObject({ type: 'createToPay', dueInDays: 5 });
+      expect(build(billInput('')).actions[0]).toMatchObject({ dueInDays: null });
+      expect(build(billInput(null)).actions[0]).toMatchObject({ dueInDays: null });
+      expect(build(billInput(0)).actions[0]).toMatchObject({ dueInDays: 0 });
+      for (const bad of ['-1', '367', '2.5', 'soon']) {
+        expect(fieldErrors(() => normalizeAutomationInput(billInput(bad), refs))).toEqual({
+          'actions.0.dueInDays': 'validation.dueInDays',
+        });
+      }
+    });
+
+    it('makes a To pay holding the transaction, due that many days after the date it is made', () => {
+      const automation = build(billInput('5'));
+      const results = buildScheduledResults(automation, run({ today: '2026-02-01' }));
+      expect(results.map((r) => r.entity)).toEqual(['toPays', 'toPays']);
+      expect(results[1]).toEqual({
+        entity: 'toPays',
+        sourceId: null,
+        record: {
+          id: scheduledResultId('auto', 0, 0, '2026-02-01'),
+          kind: 'expense',
+          accountId: 'checking',
+          toAccountId: null,
+          categoryId: 'rent',
+          payee: 'Landlord',
+          note: 'Rent February',
+          amountMinor: 80_000,
+          dueDate: '2026-02-06',
+          automationId: 'auto',
+          deleted: false,
+        },
+      });
+      const none = buildScheduledResults(build(billInput('')), run({ today: '2026-01-01' }));
+      expect(none[0].record).toMatchObject({ dueDate: null });
+    });
+
+    it('never makes a To pay again once one with its ID exists, in any state', () => {
+      const automation = build(billInput('5'));
+      const existingToPayIds = new Set([scheduledResultId('auto', 0, 0, '2026-01-01')]);
+      const results = buildScheduledResults(
+        automation,
+        run({ today: '2026-02-01', existingToPayIds }),
+      );
+      expect(results.map((r) => r.record.id)).toEqual([
+        scheduledResultId('auto', 0, 0, '2026-02-01'),
+      ]);
+    });
+
+    it('takes a percentage of the recorded transaction', () => {
+      const automation = build(
+        saveInput({
+          actions: [{ ...saveInput().actions[0], type: 'createToPay', dueInDays: '0' }],
+        }),
+      );
+      const [result] = buildEventResults(automation, [tx({})], run());
+      expect(result).toMatchObject({
+        entity: 'toPays',
+        sourceId: 'tx-1',
+        record: { kind: 'transfer', amountMinor: 25_000, dueDate: '2026-10-05' },
+      });
+    });
+
+    it('counts its accounts and categories as used', () => {
+      expect(referencedIds(build(billInput('1')))).toEqual({
+        accountIds: new Set(['checking']),
+        categoryIds: new Set(['rent']),
+      });
+    });
+  });
 });

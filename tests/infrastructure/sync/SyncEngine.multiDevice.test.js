@@ -241,6 +241,34 @@ describe('multi-device sync convergence', () => {
     }
   });
 
+  it('makes one To pay when two devices run the same automation offline', async () => {
+    const server = new InMemoryWebDav();
+    const a = await createDevice(server, 'A');
+    const b = await createDevice(server, 'B');
+    const checking = await account(a, 'Checking');
+    const input = monthly(checking, '2024-05-01');
+    await a.services.automations.create({
+      ...input,
+      actions: [{ ...input.actions[0], type: 'createToPay', dueInDays: '5' }],
+    });
+    await a.sync();
+    await b.sync();
+
+    // Offline: the next month starts on both devices, and both run the automation.
+    for (const d of [a, b]) {
+      d.clock.set('2024-06-01T09:00:00.000Z');
+      expect(await d.services.automations.run()).toBe(1);
+    }
+    await syncUntilQuiet([a, b]);
+    await expectConverged([a, b]);
+    for (const d of [a, b]) {
+      expect((await d.services.toPays.list()).map((item) => item.dueDate)).toEqual([
+        '2024-05-06',
+        '2024-06-06',
+      ]);
+    }
+  });
+
   it('sets the same budget once on every device, and a user edit beats it', async () => {
     const server = new InMemoryWebDav();
     const a = await createDevice(server, 'A');
