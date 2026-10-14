@@ -746,8 +746,7 @@ export const EN = Object.freeze({
   'transactions.payee': 'Payee',
   'transactions.note': 'Note',
   'transactions.automaticBadge': 'Automatic',
-  'transactions.madeBy':
-    'Made by the automation “{name}”.',
+  'transactions.madeBy': 'Made by the automation “{name}”.',
   'transactions.madeByDeleted': 'Made by an automation that was deleted.',
   'transactions.openAutomation': 'Open automation',
   'transactions.deleteAutomaticConfirm':
