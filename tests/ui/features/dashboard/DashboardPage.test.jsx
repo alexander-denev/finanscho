@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/preact';
+import { fireEvent, screen, waitFor, within } from '@testing-library/preact';
 import { DashboardPage } from '../../../../src/ui/features/dashboard/DashboardPage.jsx';
 import { createUiStores, renderWithStores } from '../../../helpers/renderWithStores.jsx';
 import { FakeInstallEnvironment } from '../../../helpers/FakeInstallEnvironment.js';
@@ -85,5 +85,61 @@ describe('DashboardPage', () => {
       screen.getByRole('heading', { name: 'Coming up in the next 30 days' }).closest('section')
     );
     expect(within(upcoming).getByText('Streaming')).toBeTruthy();
+  });
+
+  it('lists To pays coming up, with Pay and Delete, and opens one on its page', async () => {
+    const ui = await createUiStores();
+    const main = await ui.stores.accounts.create({
+      name: 'Main',
+      type: 'checking',
+      currency: 'EUR',
+      openingBalance: '1000',
+    });
+    /**
+     * @param {string} payee
+     * @param {string} dueDate
+     */
+    const add = (payee, dueDate) =>
+      ui.stores.toPays.create({
+        kind: 'expense',
+        amount: '10',
+        accountId: main.id,
+        payee,
+        dueDate,
+      });
+    await add('Late fee', '2024-05-10');
+    await add('Phone', '2024-06-14');
+    await add('Someday', '');
+    await add('Far away', '2024-06-15');
+    await ui.settled();
+    renderWithStores(<DashboardPage />, ui.stores);
+
+    const section = screen.getByRole('region', { name: 'Coming up in the next 30 days' });
+    const list = within(section).getByRole('list', { name: 'To pays' });
+    expect(
+      within(list)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent?.match(/^(Late fee|Phone|Someday|Far away)/)?.[0]),
+    ).toEqual(['Late fee', 'Phone', 'Someday']);
+    expect(within(list).getByText(/5 days overdue/)).toBeTruthy();
+    // No scheduled transactions: the To pays alone fill the section.
+    expect(within(section).queryByText('Nothing scheduled in the next 30 days.')).toBeNull();
+
+    fireEvent.click(within(list).getByRole('button', { name: 'Pay Late fee' }));
+    await waitFor(() =>
+      expect(within(list).queryByRole('button', { name: 'Pay Late fee' })).toBeNull(),
+    );
+    fireEvent.click(within(list).getByRole('button', { name: 'Delete Someday' }));
+    const confirm = await screen.findByRole('dialog', { name: 'Delete To pay' });
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Delete To pay' }));
+    await waitFor(() =>
+      expect(within(list).queryByRole('button', { name: 'Delete Someday' })).toBeNull(),
+    );
+    await ui.settled();
+    expect(ui.stores.toPays.items.value.map((item) => item.payee)).toEqual(['Phone', 'Far away']);
+
+    const phone = ui.stores.toPays.items.value[0];
+    fireEvent.click(within(list).getByRole('button', { name: /^Phone/ }));
+    expect(ui.stores.router.currentPath.value).toBe(`/to-pay/${phone.id}`);
   });
 });

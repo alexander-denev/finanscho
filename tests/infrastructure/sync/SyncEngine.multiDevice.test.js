@@ -206,6 +206,41 @@ describe('multi-device sync convergence', () => {
     }
   });
 
+  it('records one payment when two devices pay the same To pay offline', async () => {
+    const server = new InMemoryWebDav();
+    const a = await createDevice(server, 'A');
+    const b = await createDevice(server, 'B');
+    const checking = await a.services.accounts.create({
+      name: 'Checking',
+      type: 'checking',
+      currency: 'EUR',
+      openingBalance: '1000',
+    });
+    const rent = await a.services.toPays.create({
+      kind: 'expense',
+      amount: '800',
+      accountId: checking.id,
+      payee: 'Landlord',
+      dueDate: '2024-06-01',
+    });
+    await a.sync();
+    await b.sync();
+
+    // Offline: both pay, B a day later.
+    await a.services.toPays.pay(rent.id);
+    b.clock.advanceDays(1);
+    await b.services.toPays.pay(rent.id);
+    await syncUntilQuiet([a, b]);
+    await expectConverged([a, b]);
+    for (const d of [a, b]) {
+      expect(await d.services.toPays.list()).toEqual([]);
+      const { items } = await d.services.transactions.query({ limit: 100 });
+      expect(items).toHaveLength(1);
+      expect(items[0]).toMatchObject({ payee: 'Landlord', date: '2024-05-16' });
+      expect((await d.services.accounts.listWithBalances())[0].balanceMinor).toBe(20000);
+    }
+  });
+
   it('sets the same budget once on every device, and a user edit beats it', async () => {
     const server = new InMemoryWebDav();
     const a = await createDevice(server, 'A');
